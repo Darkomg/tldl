@@ -344,27 +344,47 @@ async function runDownload(id, outDir) {
           dl.log.push(`[DL] ${info.filename}${attempt > 1 ? ` (intento ${attempt})` : ''}`);
           dl.fileProgress = 0;
           broadcast({ type: 'download_update', download: sanitizeDl(dl) });
-          let lastBroadcast = Date.now();
-          await client.downloadMedia(msgs[0], {
-            outputFile: filename,
-            progressCallback: (received, total) => {
-              dl.fileProgress = total > 0 ? Number(received) / Number(total) : 0;
-              const now = Date.now();
-              if (now - lastBroadcast > 1500) {
-                lastBroadcast = now;
-                broadcast({ type: 'download_update', download: sanitizeDl(dl) });
-              }
+
+          // Get expected file size from Telegram metadata
+          const expectedSize = msgs[0].media?.document?.size
+            ? Number(msgs[0].media.document.size) : 0;
+
+          // Stream wrapper: tracks progress and supports cancel/pause
+          let interrupted = null;
+          const fileStream = fs.createWriteStream(filename);
+          const outFile = {
+            write: (chunk) => {
+              if (dl.cancelled) { interrupted = 'cancelled'; throw new Error('cancelled'); }
+              if (dl.paused)    { interrupted = 'paused';    throw new Error('paused'); }
+              fileStream.write(chunk);
             },
-          });
-          dl.done++;
-          dl.fileProgress = 0;
-          dl.log.push(`[OK] ${info.filename}`);
-          broadcast({ type: 'download_update', download: sanitizeDl(dl) });
-          success = true;
-          break;
-        } catch (e) {
-          if (attempt < 3) await new Promise(r => setTimeout(r, 3000));
-        }
+          };
+
+          // Disk-polling interval for progress
+          const progressInterval = setInterval(() => {
+            try {
+              const written = fileStream.bytesWritten;
+              dl.fileProgress = expectedSize > 0 ? written / expectedSize : 0;
+              broadcast({ type: 'download_update', download: sanitizeDl(dl) });
+            } catch {}
+          }, 1500);
+
+          try {
+            await client.downloadMedia(msgs[0], { outputFile: outFile });
+            clearInterval(progressInterval);
+            await new Promise((res, rej) => fileStream.end(err => err ? rej(err) : res()));
+            dl.done++;
+            dl.fileProgress = 0;
+            dl.log.push(`[OK] ${info.filename}`);
+            broadcast({ type: 'download_update', download: sanitizeDl(dl) });
+            success = true;
+            break;
+          } catch (e) {
+            clearInterval(progressInterval);
+            try { fileStream.destroy(); fs.unlinkSync(filename); } catch {}
+            if (interrupted) { skipped = true; break; }
+            if (attempt < 3) await new Promise(r => setTimeout(r, 3000));
+          }
       }
 
       if (!skipped && !success) {

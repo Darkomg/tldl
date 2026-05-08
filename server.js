@@ -385,6 +385,9 @@ async function runDownload(id, outDir) {
             if (interrupted) { skipped = true; break; }
             if (attempt < 3) await new Promise(r => setTimeout(r, 3000));
           }
+        } catch (e) {
+          if (attempt < 3) await new Promise(r => setTimeout(r, 3000));
+        }
       }
 
       if (!skipped && !success) {

@@ -13,4 +13,4 @@ services:
       - DOWNLOADS_DIR=/downloads
     volumes:
       - ./data:/data
-      - /DATA/.media/SSD1TERA/Series:/downloads
+      - /DATA/.media/SSD1TERA:/downloads

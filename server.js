@@ -40,6 +40,20 @@ function saveSession(session) {
   fs.writeFileSync(CREDS_FILE, JSON.stringify({ session }, null, 2));
 }
 
+const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
+
+function loadConfig() {
+  if (fs.existsSync(CONFIG_FILE)) {
+    try { return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); } catch { return {}; }
+  }
+  return {};
+}
+
+function saveConfig(cfg) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
+}
+
 async function getClient() {
   if (tgClient && !tgClient.disconnected) return tgClient;
   const session = loadSession();
@@ -101,6 +115,15 @@ app.post('/api/auth/logout', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ── Config ────────────────────────────────────────────────────────────────────
+app.get('/api/config', (req, res) => res.json(loadConfig()));
+app.post('/api/config', (req, res) => {
+  const cfg = loadConfig();
+  Object.assign(cfg, req.body);
+  saveConfig(cfg);
+  res.json({ ok: true });
 });
 
 // ── Channels ─────────────────────────────────────────────────────────────────
@@ -165,7 +188,10 @@ app.post('/api/download', async (req, res) => {
   }
 
   const id = uuidv4();
-  const outDir = path.join(DOWNLOADS_DIR, outputFolder || channelTitle || channelId);
+  const { downloadsRoot } = loadConfig();
+  const outDir = downloadsRoot
+    ? path.join(DOWNLOADS_DIR, downloadsRoot, outputFolder || channelTitle || channelId)
+    : path.join(DOWNLOADS_DIR, outputFolder || channelTitle || channelId);
 
   downloads[id] = {
     id, channelId, channelTitle,

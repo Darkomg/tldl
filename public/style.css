@@ -42,7 +42,7 @@ body {
   width: 360px;
   text-align: center;
 }
-.logo { font-size: 48px; margin-bottom: 16px; }
+.logo { margin-bottom: 16px; display: flex; justify-content: center; }
 .login-box h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
 .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
 .hint { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
@@ -187,7 +187,7 @@ nav { padding: 12px 8px; display: flex; flex-direction: column; gap: 4px; }
   gap: 12px;
   flex-wrap: wrap;
 }
-.toolbar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.toolbar-right { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
 .toolbar label { font-size: 13px; color: var(--muted); }
 .folder-input {
   background: var(--bg3);
@@ -200,7 +200,38 @@ nav { padding: 12px 8px; display: flex; flex-direction: column; gap: 4px; }
   outline: none;
 }
 .folder-input:focus { border-color: var(--accent); }
+.folder-path-label { font-size: 13px; color: var(--muted); white-space: nowrap; }
 .toolbar .btn-primary { width: auto; padding: 8px 18px; font-size: 13px; margin: 0; }
+
+/* ── Destination picker ── */
+.dest-picker { display: flex; flex-direction: column; gap: 6px; }
+.dest-preview {
+  font-size: 11px; color: var(--muted); font-family: monospace;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px;
+}
+
+/* ── Settings ── */
+.settings-body { padding: 28px 24px; overflow-y: auto; flex: 1; }
+.settings-section {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 24px; max-width: 460px;
+}
+.settings-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+.settings-desc { font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.6; }
+.settings-desc code { background: var(--bg3); padding: 1px 6px; border-radius: 4px; font-size: 11px; color: var(--text); font-family: monospace; }
+.settings-row { display: flex; align-items: stretch; margin-bottom: 8px; }
+.settings-prefix {
+  font-family: monospace; font-size: 13px; color: var(--muted);
+  background: var(--bg3); border: 1px solid var(--border); border-right: none;
+  padding: 8px 10px; border-radius: 6px 0 0 6px; white-space: nowrap; display: flex; align-items: center;
+}
+.settings-input {
+  flex: 1; background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 12px; border-radius: 0 6px 6px 0; font-size: 13px; outline: none;
+}
+.settings-input:focus { border-color: var(--accent); }
+.settings-preview { font-size: 11px; color: var(--muted); font-family: monospace; margin-bottom: 18px; }
+.settings-save { width: auto; padding: 9px 22px; font-size: 13px; margin: 0; }
 .checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text); font-size: 13px; }
 .checkbox-label input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
 

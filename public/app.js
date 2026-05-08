@@ -3,6 +3,7 @@ let currentChannelId = null;
 let currentChannelTitle = null;
 let ws = null;
 let downloads = {};
+let appConfig = {};
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -50,6 +51,7 @@ function showLogin() {
 function showApp() {
   document.getElementById('screen-login').style.display = 'none';
   document.getElementById('screen-app').style.display = 'flex';
+  loadAppConfig();
   loadChannels();
 }
 
@@ -86,6 +88,12 @@ function bindEvents() {
 
   // Videos
   document.getElementById('chk-select-all').onchange = toggleSelectAll;
+  document.getElementById('input-subfolder').addEventListener('input', updatePathPreview);
+  document.getElementById('input-downloads-root').addEventListener('input', () => {
+    const v = document.getElementById('input-downloads-root').value.trim();
+    document.getElementById('settings-path-preview').textContent = v ? `📁 /downloads/${v}/…` : '📁 /downloads/…';
+  });
+  document.getElementById('btn-save-settings').onclick = saveSettings;
   document.getElementById('btn-start-download').onclick = startDownload;
 
   // Downloads
@@ -176,7 +184,8 @@ async function openChannel(id, title) {
   currentChannelId = id;
   currentChannelTitle = title;
   document.getElementById('channel-detail-title').textContent = title;
-  document.getElementById('input-output-folder').value = sanitizeFolderName(title);
+  document.getElementById('input-subfolder').value = sanitizeFolderName(title);
+  updatePathPreview();
   document.getElementById('btn-start-download').disabled = true;
   document.getElementById('chk-select-all').checked = false;
   showView('channel-detail');
@@ -218,7 +227,7 @@ function updateDownloadBtn() {
 
 async function startDownload() {
   const messageIds = [...document.querySelectorAll('.video-chk:checked')].map(c => parseInt(c.dataset.id));
-  const outputFolder = document.getElementById('input-output-folder').value.trim() || currentChannelTitle;
+  const outputFolder = document.getElementById('input-subfolder').value.trim() || currentChannelTitle;
   if (!messageIds.length) return;
 
   const res = await api('/api/download', 'POST', {
@@ -321,6 +330,36 @@ function escHtml(str) {
 
 function sanitizeFolderName(name) {
   return name.replace(/[<>:"/\\|?*]/g, '').trim();
+}
+
+function updatePathPreview() {
+  const root = appConfig.downloadsRoot || '';
+  const sub = document.getElementById('input-subfolder').value.trim();
+  const parts = ['/downloads', root, sub || '…'].filter(Boolean);
+  document.getElementById('dest-preview').textContent = '📁 ' + parts.join('/');
+}
+
+async function loadAppConfig() {
+  const cfg = await api('/api/config');
+  if (!cfg.error) {
+    appConfig = cfg;
+    const rootInput = document.getElementById('input-downloads-root');
+    if (rootInput) rootInput.value = cfg.downloadsRoot || '';
+    const preview = document.getElementById('settings-path-preview');
+    if (preview) {
+      const v = cfg.downloadsRoot || '';
+      preview.textContent = v ? `📁 /downloads/${v}/…` : '📁 /downloads/…';
+    }
+  }
+}
+
+async function saveSettings() {
+  const root = document.getElementById('input-downloads-root').value.trim();
+  const res = await api('/api/config', 'POST', { downloadsRoot: root });
+  if (res.ok) {
+    appConfig.downloadsRoot = root;
+    toast('Configuración guardada');
+  }
 }
 
 let toastTimer;

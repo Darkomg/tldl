@@ -10,7 +10,20 @@
   <!-- LOGIN -->
   <div id="screen-login" class="screen active">
     <div class="login-box">
-      <div class="logo">✈️</div>
+      <div class="logo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="64" height="64">
+          <defs>
+            <linearGradient id="tg-login-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#37aee2"/>
+              <stop offset="100%" stop-color="#1e96c8"/>
+            </linearGradient>
+          </defs>
+          <circle cx="24" cy="24" r="24" fill="url(#tg-login-bg)"/>
+          <path d="M8 22L40 11L32 37L21 29Z" fill="white"/>
+          <path d="M21 29L19 37L32 37Z" fill="rgba(255,255,255,0.5)"/>
+          <path d="M24 34L24 43M20 40L24 44L28 40" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
       <h1>Telegram Downloader</h1>
       <p class="subtitle">Conecta tu cuenta para empezar</p>
       <div id="login-phone-step">
@@ -32,12 +45,25 @@
     <!-- SIDEBAR -->
     <aside id="sidebar">
       <div class="sidebar-header">
-        <span class="app-title">✈️ TG Downloader</span>
+        <span class="app-title">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20" height="20" style="vertical-align:middle;margin-right:6px;margin-bottom:2px">
+            <defs>
+              <linearGradient id="tg-sidebar-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#37aee2"/>
+                <stop offset="100%" stop-color="#1e96c8"/>
+              </linearGradient>
+            </defs>
+            <circle cx="24" cy="24" r="24" fill="url(#tg-sidebar-bg)"/>
+            <path d="M8 22L40 11L32 37L21 29Z" fill="white"/>
+            <path d="M21 29L19 37L32 37Z" fill="rgba(255,255,255,0.5)"/>
+            <path d="M24 34L24 43M20 40L24 44L28 40" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>TG Downloader</span>
         <button id="btn-logout" title="Cerrar sesión">⏻</button>
       </div>
       <nav>
         <button class="nav-btn active" data-view="channels">📡 Canales</button>
         <button class="nav-btn" data-view="downloads">⬇️ Descargas</button>
+        <button class="nav-btn" data-view="settings">⚙️ Configuración</button>
       </nav>
     </aside>
 
@@ -59,7 +85,7 @@
       </div>
 
       <!-- CHANNEL DETAIL VIEW -->
-      <div id="view-channel-detail" class="view hidden">
+      <div id="view-channel-detail" class="view">
         <div class="view-header">
           <button id="btn-back-channels" class="btn-icon">←</button>
           <h2 id="channel-detail-title">Canal</h2>
@@ -69,9 +95,10 @@
             <input type="checkbox" id="chk-select-all"> Seleccionar todo
           </label>
           <div class="toolbar-right">
-            <label>Carpeta destino:
-              <input id="input-output-folder" type="text" placeholder="NombreSerie" class="folder-input">
-            </label>
+            <div class="dest-picker">
+              <input id="input-subfolder" type="text" placeholder="NombreSerie" class="folder-input">
+              <div class="dest-preview" id="dest-preview">📁 /downloads/…</div>
+            </div>
             <button id="btn-start-download" class="btn-primary" disabled>⬇️ Descargar seleccionados</button>
           </div>
         </div>
@@ -80,8 +107,27 @@
         </div>
       </div>
 
+      <!-- SETTINGS VIEW -->
+      <div id="view-settings" class="view">
+        <div class="view-header">
+          <h2>Configuración</h2>
+        </div>
+        <div class="settings-body">
+          <div class="settings-section">
+            <div class="settings-title">Carpeta base de descargas</div>
+            <div class="settings-desc">Subcarpeta dentro de <code>/downloads</code> donde se guardarán los archivos. Déjalo vacío para guardar directamente en <code>/downloads</code>.</div>
+            <div class="settings-row">
+              <span class="settings-prefix">/downloads/</span>
+              <input id="input-downloads-root" type="text" placeholder="Series" class="settings-input">
+            </div>
+            <div class="settings-preview" id="settings-path-preview">📁 /downloads/…</div>
+            <button id="btn-save-settings" class="btn-primary settings-save">Guardar</button>
+          </div>
+        </div>
+      </div>
+
       <!-- DOWNLOADS VIEW -->
-      <div id="view-downloads" class="view hidden">
+      <div id="view-downloads" class="view">
         <div class="view-header">
           <h2>Descargas</h2>
           <button id="btn-clear-completed" class="btn-ghost">Limpiar completadas</button>

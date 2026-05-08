@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telegram Downloader — Preview</title>
+  <style>
+    .preview-bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 9999; height: 33px;
+      background: #1a1030; border-bottom: 1px solid #3a2a6a;
+      padding: 0 16px; font-size: 11px; color: #8878b8;
+      display: flex; align-items: center; gap: 10px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    .preview-badge {
+      background: #5b8dee; color: #fff; font-size: 9px; font-weight: 800;
+      padding: 2px 7px; border-radius: 4px; letter-spacing: 1px; text-transform: uppercase;
+    }
+    .preview-bar a {
+      color: #5b8dee; text-decoration: none; cursor: pointer;
+      border: 1px solid #5b8dee33; padding: 2px 8px; border-radius: 4px; font-size: 10px;
+      margin-left: auto;
+    }
+    .preview-bar a:hover { background: #5b8dee22; }
+
+    :root {
+      --bg: #0f1117; --bg2: #1a1d27; --bg3: #242736; --border: #2e3248;
+      --accent: #5b8dee; --accent-hover: #4a7cdf;
+      --green: #3dd68c; --yellow: #f5c842; --red: #e05c5c;
+      --text: #e2e4f0; --muted: #7b8099; --sidebar-w: 220px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+      height: 100vh; overflow: hidden; padding-top: 33px;
+    }
+    .screen { display: none; width: 100%; height: calc(100vh - 33px); }
+    .screen.active { display: flex; }
+    .hidden { display: none !important; }
+
+    #screen-login {
+      align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at center, #1a1d27 0%, #0f1117 100%);
+    }
+    .login-box {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 16px; padding: 48px 40px; width: 360px; text-align: center;
+    }
+    .logo { margin-bottom: 16px; display: flex; justify-content: center; }
+    .login-box h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+    .hint { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+    .login-box input {
+      width: 100%; background: var(--bg3); border: 1px solid var(--border);
+      color: var(--text); padding: 12px 16px; border-radius: 8px;
+      font-size: 15px; margin-bottom: 12px; outline: none; transition: border-color 0.2s;
+    }
+    .login-box input:focus { border-color: var(--accent); }
+    .error { color: var(--red); font-size: 13px; margin-top: 10px; padding: 8px; background: rgba(224,92,92,0.1); border-radius: 6px; }
+
+    .btn-primary {
+      width: 100%; background: var(--accent); color: #fff; border: none;
+      padding: 12px; border-radius: 8px; font-size: 15px; font-weight: 600;
+      cursor: pointer; transition: background 0.2s; margin-bottom: 8px;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:disabled { background: var(--bg3); color: var(--muted); cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent; border: 1px solid var(--border); color: var(--muted);
+      padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-ghost:hover { border-color: var(--text); color: var(--text); }
+    .btn-icon {
+      background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+      width: 36px; height: 36px; border-radius: 8px; font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: background 0.2s; flex-shrink: 0;
+    }
+    .btn-icon:hover { background: var(--border); }
+
+    #screen-app { flex-direction: row; }
+    #sidebar {
+      width: var(--sidebar-w); background: var(--bg2);
+      border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0;
+    }
+    .sidebar-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 16px; border-bottom: 1px solid var(--border);
+    }
+    .app-title { font-weight: 700; font-size: 15px; display: flex; align-items: center; }
+    #btn-logout { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 4px; border-radius: 4px; transition: color 0.2s; }
+    #btn-logout:hover { color: var(--red); }
+    nav { padding: 12px 8px; display: flex; flex-direction: column; gap: 4px; }
+    .nav-btn {
+      background: transparent; border: none; color: var(--muted);
+      text-align: left; padding: 10px 12px; border-radius: 8px;
+      font-size: 14px; cursor: pointer; transition: all 0.2s;
+    }
+    .nav-btn:hover { background: var(--bg3); color: var(--text); }
+    .nav-btn.active { background: var(--bg3); color: var(--accent); font-weight: 600; }
+
+    #main-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+    .view { display: none; flex-direction: column; height: 100%; overflow: hidden; }
+    .view.active { display: flex; }
+
+    .view-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 20px 24px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .view-header h2 { font-size: 18px; font-weight: 700; flex: 1; }
+
+    .search-bar { padding: 12px 24px; flex-shrink: 0; }
+    .search-bar input {
+      width: 100%; background: var(--bg2); border: 1px solid var(--border);
+      color: var(--text); padding: 10px 14px; border-radius: 8px; font-size: 14px; outline: none;
+    }
+    .search-bar input:focus { border-color: var(--accent); }
+
+    .toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 24px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0; gap: 12px; flex-wrap: wrap;
+    }
+    .toolbar-right { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+    .toolbar label { font-size: 13px; color: var(--muted); }
+    .folder-input {
+      background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+      padding: 7px 12px; border-radius: 6px; font-size: 13px; width: 180px; outline: none;
+    }
+    .folder-input:focus { border-color: var(--accent); }
+    .folder-path-label { font-size: 13px; color: var(--muted); white-space: nowrap; }
+    .toolbar .btn-primary { width: auto; padding: 8px 18px; font-size: 13px; margin: 0; }
+    .dest-picker { display: flex; flex-direction: column; gap: 6px; }
+    .dest-preview { font-size: 11px; color: var(--muted); font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px; }
+    .dest-locations { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 2px; }
+    .dest-loc-btn {
+      background: var(--bg3); border: 1px solid var(--border); color: var(--muted);
+      padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+    }
+    .dest-loc-btn:hover { border-color: var(--accent); color: var(--text); }
+    .dest-loc-btn.active { background: rgba(91,141,238,0.15); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+    .settings-body { padding: 28px 24px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 20px; }
+    .settings-section { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px; max-width: 500px; }
+    .settings-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+    .settings-desc { font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.6; }
+    .settings-desc code { background: var(--bg3); padding: 1px 6px; border-radius: 4px; font-size: 11px; color: var(--text); font-family: monospace; }
+    .settings-loc-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; margin-bottom: 8px;
+    }
+    .settings-loc-icon { font-size: 18px; flex-shrink: 0; }
+    .settings-loc-info { flex: 1; min-width: 0; }
+    .settings-loc-name { font-size: 13px; font-weight: 600; }
+    .settings-loc-path { font-size: 11px; color: var(--muted); font-family: monospace; margin-top: 2px; }
+    .settings-loc-badge {
+      font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+      background: rgba(91,141,238,0.15); color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .settings-hint { font-size: 12px; color: var(--muted); margin-top: 12px; padding: 10px 12px; background: var(--bg); border-radius: 6px; border: 1px solid var(--border); line-height: 1.5; }
+    .settings-hint code { color: var(--yellow); font-family: monospace; font-size: 11px; }
+    .checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text); font-size: 13px; }
+    .checkbox-label input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
+
+    .list-container { flex: 1; overflow-y: auto; padding: 8px 16px 24px; }
+    .list-container::-webkit-scrollbar { width: 6px; }
+    .list-container::-webkit-scrollbar-track { background: transparent; }
+    .list-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .loading, .empty-state { text-align: center; color: var(--muted); padding: 48px 24px; font-size: 14px; }
+
+    .channel-card {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; border-radius: 10px; cursor: pointer; transition: background 0.15s; margin-bottom: 4px;
+    }
+    .channel-card:hover { background: var(--bg3); }
+    .channel-avatar {
+      width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .channel-info { flex: 1; min-width: 0; }
+    .channel-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .channel-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .channel-arrow { color: var(--muted); font-size: 16px; }
+
+    .video-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; border-radius: 8px; transition: background 0.15s; margin-bottom: 2px;
+    }
+    .video-row:hover { background: var(--bg3); }
+    .video-row input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
+    .video-num { color: var(--muted); font-size: 12px; font-family: monospace; width: 40px; flex-shrink: 0; }
+    .video-caption { flex: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .video-caption .no-caption { color: var(--muted); font-style: italic; }
+
+    .download-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 10px; }
+    .download-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .download-title { font-size: 14px; font-weight: 600; }
+    .download-status { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .status-running { background: rgba(91,141,238,0.15); color: var(--accent); }
+    .status-completed { background: rgba(61,214,140,0.15); color: var(--green); }
+    .status-error { background: rgba(224,92,92,0.15); color: var(--red); }
+    .status-queued { background: rgba(245,200,66,0.15); color: var(--yellow); }
+    .progress-bar-wrap { background: var(--bg3); border-radius: 4px; height: 6px; margin-bottom: 8px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.3s ease; }
+    .progress-bar-fill.completed { background: var(--green); }
+    .progress-bar-fill.error { background: var(--red); }
+    .download-stats { display: flex; gap: 16px; font-size: 12px; color: var(--muted); margin-bottom: 10px; flex-wrap: wrap; }
+    .download-stats span b { color: var(--text); }
+    .download-log {
+      background: #0d1117; border-radius: 6px; padding: 8px 12px;
+      font-family: monospace; font-size: 11px; color: var(--muted);
+      max-height: 120px; overflow-y: auto; line-height: 1.6;
+    }
+    .log-ok { color: var(--green); }
+    .log-skip { color: var(--muted); }
+    .log-fail { color: var(--red); }
+    .log-dl { color: var(--accent); }
+    .download-card-footer { display: flex; justify-content: flex-end; margin-top: 10px; }
+
+    .badge { background: var(--accent); color: #fff; border-radius: 10px; font-size: 11px; font-weight: 700; padding: 2px 7px; margin-left: 6px; }
+
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+      padding: 10px 20px; border-radius: 8px; font-size: 13px;
+      z-index: 1000; pointer-events: none; opacity: 1; transition: opacity 0.3s;
+    }
+    .toast.hidden { opacity: 0; }
+  </style>
+</head>
+<body>
+
+<div class="preview-bar">
+  <span class="preview-badge">Preview</span>
+  <span>Datos ficticios · interacciones simuladas</span>
+  <a onclick="skipToApp()">Saltar login →</a>
+</div>
+
+<!-- LOGIN -->
+<div id="screen-login" class="screen active">
+  <div class="login-box">
+    <div class="logo">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="64" height="64">
+        <defs>
+          <linearGradient id="tg-login-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#37aee2"/>
+            <stop offset="100%" stop-color="#1e96c8"/>
+          </linearGradient>
+        </defs>
+        <circle cx="24" cy="24" r="24" fill="url(#tg-login-bg)"/>
+        <path d="M8 22L40 11L32 37L21 29Z" fill="white"/>
+        <path d="M21 29L19 37L32 37Z" fill="rgba(255,255,255,0.5)"/>
+        <path d="M24 34L24 43M20 40L24 44L28 40" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </div>
+    <h1>Telegram Downloader</h1>
+    <p class="subtitle">Conecta tu cuenta para empezar</p>
+    <div id="login-phone-step">
+      <input id="input-phone" type="tel" placeholder="+521234567890" autocomplete="tel">
+      <button id="btn-send-code" class="btn-primary">Enviar código</button>
+    </div>
+    <div id="login-code-step" class="hidden">
+      <p class="hint">Ingresa el código que recibiste en Telegram</p>
+      <input id="input-code" type="text" placeholder="12345" maxlength="6">
+      <button id="btn-verify-code" class="btn-primary">Verificar</button>
+      <button id="btn-back-phone" class="btn-ghost">← Cambiar número</button>
+    </div>
+    <div id="login-error" class="error hidden"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="screen-app" class="screen" style="display:none">
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <span class="app-title">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20" height="20" style="vertical-align:middle;margin-right:6px;margin-bottom:2px;flex-shrink:0">
+          <defs>
+            <linearGradient id="tg-sidebar-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#37aee2"/>
+              <stop offset="100%" stop-color="#1e96c8"/>
+            </linearGradient>
+          </defs>
+          <circle cx="24" cy="24" r="24" fill="url(#tg-sidebar-bg)"/>
+          <path d="M8 22L40 11L32 37L21 29Z" fill="white"/>
+          <path d="M21 29L19 37L32 37Z" fill="rgba(255,255,255,0.5)"/>
+          <path d="M24 34L24 43M20 40L24 44L28 40" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>TG Downloader</span>
+      <button id="btn-logout" title="Cerrar sesión">⏻</button>
+    </div>
+    <nav>
+      <button class="nav-btn active" data-view="channels">📡 Canales</button>
+      <button class="nav-btn" data-view="downloads">⬇️ Descargas</button>
+      <button class="nav-btn" data-view="settings">⚙️ Configuración</button>
+    </nav>
+  </aside>
+
+  <main id="main-content">
+    <div id="view-channels" class="view active">
+      <div class="view-header">
+        <h2>Canales</h2>
+        <button id="btn-refresh-channels" class="btn-icon" title="Refrescar">↺</button>
+      </div>
+      <div class="search-bar">
+        <input id="input-search-channels" type="text" placeholder="Buscar canal...">
+      </div>
+      <div id="channels-list" class="list-container">
+        <div class="loading">Cargando canales...</div>
+      </div>
+    </div>
+
+    <div id="view-channel-detail" class="view">
+      <div class="view-header">
+        <button id="btn-back-channels" class="btn-icon">←</button>
+        <h2 id="channel-detail-title">Canal</h2>
+      </div>
+      <div class="toolbar">
+        <label class="checkbox-label">
+          <input type="checkbox" id="chk-select-all"> Seleccionar todo
+        </label>
+        <div class="toolbar-right">
+          <div class="dest-picker">
+            <div class="dest-locations" id="dest-locations"></div>
+            <input id="input-subfolder" type="text" placeholder="NombreSerie" class="folder-input">
+            <div class="dest-preview" id="dest-preview">📁 /downloads/…</div>
+          </div>
+          <button id="btn-start-download" class="btn-primary" disabled>⬇️ Descargar seleccionados</button>
+        </div>
+      </div>
+      <div id="videos-list" class="list-container">
+        <div class="loading">Cargando videos...</div>
+      </div>
+    </div>
+
+    <div id="view-settings" class="view">
+      <div class="view-header"><h2>Configuración</h2></div>
+      <div class="settings-body">
+        <div class="settings-section">
+          <div class="settings-title">Ubicaciones de descarga</div>
+          <div class="settings-desc">Cada ubicación es un volumen montado en el contenedor. Para agregar una nueva, monta una carpeta en ZimaOS y agrégala a la variable <code>LOCATIONS</code> en la configuración del contenedor.</div>
+          <div id="settings-locations-list"></div>
+          <div class="settings-hint">Para agregar <strong>carpeta2</strong>:<br>1. Agrega el volumen en ZimaOS: <code>/tu/ruta → /mnt/carpeta2</code><br>2. Agrega a la variable: <code>LOCATIONS=Downloads:/downloads,carpeta1:/mnt/carpeta1,carpeta2:/mnt/carpeta2</code></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-downloads" class="view">
+      <div class="view-header">
+        <h2>Descargas</h2>
+        <button id="btn-clear-completed" class="btn-ghost">Limpiar completadas</button>
+      </div>
+      <div id="downloads-list" class="list-container">
+        <div class="empty-state">No hay descargas activas.</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+// ── MOCK DATA ───────────────────────────────────────────────────────────────
+const AVATAR_COLORS = ['#5b8dee','#7c5cbf','#3dd68c','#e05c5c','#f5c842','#37aee2','#e87d4e'];
+const MOCK_LOCATIONS = [
+  { name: 'Downloads', path: '/downloads' },
+  { name: 'carpeta1', path: '/mnt/carpeta1' },
+];
+const MOCK_CHANNELS = [
+  { id: '1683893058', title: '[ULS&GF] Kaitou Sentai Lupinranger VS Keisatsu Sentai Patranger', username: null, participantsCount: null },
+  { id: '1234567001', title: '[ULS&RS] Bakuage Sentai Boonboomger', username: null, participantsCount: 128 },
+  { id: '1234567002', title: 'No.1 Sentai Gozyuger', username: null, participantsCount: null },
+  { id: '1234567003', title: 'KingOhger Fansub', username: 'kingohger', participantsCount: 1240 },
+  { id: '1234567004', title: 'Kamen Rider Geats Subs', username: 'krgeats', participantsCount: 3850 },
+  { id: '1234567005', title: '[DDL] Super Sentai Collection', username: null, participantsCount: 567 },
+  { id: '1234567006', title: 'Ultraman Z Fansub', username: 'ultramanzfs', participantsCount: 2100 },
+];
+
+function getMockVideos(channelId) {
+  if (channelId === '1683893058') {
+    const v = [];
+    for (let i = 1; i <= 51; i++)
+      v.push({ id: 60000 + i, caption: `[ULS&GF] Lupinranger VS Patranger - ${String(i).padStart(2,'0')}${i===51?' Final':''}`, date: 1600000000 + i*86400 });
+    v.push({ id: 60052, caption: '[ULS&GF] Lupinranger VS Patranger en Film', date: 1600000000+52*86400 });
+    v.push({ id: 60053, caption: '[ULS&GF] Another Patren 2gou', date: 1600000000+53*86400 });
+    v.push({ id: 60054, caption: '', date: 1600000000+54*86400 });
+    return v;
+  }
+  const seed = parseInt(channelId.slice(-3));
+  return Array.from({ length: 12 + (seed % 8) }, (_, i) => ({
+    id: parseInt(channelId.slice(-6)) + i,
+    caption: `Episodio ${String(i+1).padStart(2,'0')}`,
+    date: 1600000000 + i*86400,
+  }));
+}
+
+// ── MOCK API ────────────────────────────────────────────────────────────────
+let mockLoggedIn = false;
+
+async function api(url, method = 'GET', body = null) {
+  await new Promise(r => setTimeout(r, 100 + Math.random() * 150));
+
+  if (url === '/api/auth/status') return { authorized: mockLoggedIn };
+  if (url === '/api/auth/logout' && method === 'POST') { mockLoggedIn = false; return { ok: true }; }
+  if (url === '/api/auth/phone' && method === 'POST') return { ok: true };
+  if (url === '/api/auth/code' && method === 'POST') { mockLoggedIn = true; return { ok: true }; }
+  if (url === '/api/config') return appConfig;
+  if (url === '/api/config' && method === 'POST') { Object.assign(appConfig, body); return { ok: true }; }
+  if (url === '/api/locations') return MOCK_LOCATIONS;
+  if (url === '/api/channels') return MOCK_CHANNELS;
+
+  const vm = url.match(/\/api\/channels\/([^/]+)\/videos/);
+  if (vm) {
+    await new Promise(r => setTimeout(r, 400 + Math.random() * 300));
+    const ch = MOCK_CHANNELS.find(c => c.id === vm[1]);
+    return { channelId: vm[1], title: ch ? ch.title : 'Canal', videos: getMockVideos(vm[1]) };
+  }
+
+  if (url === '/api/download' && method === 'POST') {
+    const id = 'dl-' + Date.now();
+    const dl = {
+      id, channelId: body.channelId, channelTitle: body.channelTitle,
+      total: body.messageIds.length, done: 0, failed: 0, status: 'queued',
+      outDir: `${body.downloadPath||'/downloads'}/${body.outputFolder||body.channelTitle}`,
+      log: [], percent: 0,
+    };
+    downloads[id] = dl;
+    renderDownloads();
+    updateDownloadsBadge();
+    simulateDownload(id, body.messageIds);
+    return { downloadId: id };
+  }
+  if (url.startsWith('/api/downloads/') && method === 'DELETE') return { ok: true };
+  if (url === '/api/downloads') return Object.values(downloads);
+  return { error: 'Not found' };
+}
+
+// ── DOWNLOAD SIMULATION ──────────────────────────────────────────────────────
+function simulateDownload(dlId, messageIds) {
+  const dl = downloads[dlId];
+  if (!dl) return;
+  setTimeout(() => {
+    if (!downloads[dlId]) return;
+    dl.status = 'running';
+    renderDownloads(); updateDownloadsBadge();
+    let i = 0;
+    function next() {
+      if (!downloads[dlId]) return;
+      if (i >= messageIds.length) {
+        dl.status = 'completed'; dl.percent = 100;
+        renderDownloads(); updateDownloadsBadge(); return;
+      }
+      const msgId = messageIds[i];
+      const fname = String(msgId).padStart(5,'0') + '.mp4';
+      dl.log.push(`[DL] msg ${msgId}`);
+      renderDownloads();
+      setTimeout(() => {
+        if (!downloads[dlId]) return;
+        if (Math.random() > 0.03) { dl.done++; dl.log.push(`[OK] ${fname}`); }
+        else { dl.failed++; dl.log.push(`[FAIL] msg ${msgId}`); }
+        dl.percent = Math.round((dl.done / dl.total) * 100);
+        renderDownloads(); updateDownloadsBadge();
+        i++;
+        setTimeout(next, 50 + Math.random() * 100);
+      }, 180 + Math.random() * 250);
+    }
+    next();
+  }, 350);
+}
+
+// ── SKIP LOGIN ───────────────────────────────────────────────────────────────
+function skipToApp() { mockLoggedIn = true; showApp(); }
+
+// ── APP STATE ────────────────────────────────────────────────────────────────
+let currentChannelId = null;
+let currentChannelTitle = null;
+let currentDownloadPath = '/downloads';
+let downloads = {};
+let appConfig = {};
+
+// ── WEBSOCKET (no-op in preview) ─────────────────────────────────────────────
+function initWebSocket() {}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  initWebSocket();
+  const { authorized } = await api('/api/auth/status');
+  if (authorized) showApp(); else showLogin();
+  bindEvents();
+});
+
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
+function showLogin() {
+  document.getElementById('screen-login').style.display = 'flex';
+  document.getElementById('screen-app').style.display = 'none';
+}
+function showApp() {
+  document.getElementById('screen-login').style.display = 'none';
+  document.getElementById('screen-app').style.display = 'flex';
+  loadAppConfig();
+  loadChannels();
+}
+
+function bindEvents() {
+  document.getElementById('btn-send-code').onclick = sendPhone;
+  document.getElementById('btn-verify-code').onclick = verifyCode;
+  document.getElementById('btn-back-phone').onclick = () => {
+    document.getElementById('login-code-step').classList.add('hidden');
+    document.getElementById('login-phone-step').classList.remove('hidden');
+  };
+  document.getElementById('input-phone').addEventListener('keydown', e => { if (e.key==='Enter') sendPhone(); });
+  document.getElementById('input-code').addEventListener('keydown', e => { if (e.key==='Enter') verifyCode(); });
+  document.getElementById('btn-logout').onclick = async () => { await api('/api/auth/logout','POST'); showLogin(); };
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (btn.dataset.view === 'settings') loadSettings();
+      showView(btn.dataset.view);
+    };
+  });
+  document.getElementById('btn-refresh-channels').onclick = loadChannels;
+  document.getElementById('input-search-channels').oninput = filterChannels;
+  document.getElementById('btn-back-channels').onclick = () => showView('channels');
+  document.getElementById('chk-select-all').onchange = toggleSelectAll;
+  document.getElementById('input-subfolder').addEventListener('input', updatePathPreview);
+  document.getElementById('btn-start-download').onclick = startDownload;
+  document.getElementById('btn-clear-completed').onclick = clearCompleted;
+}
+
+async function sendPhone() {
+  const phone = document.getElementById('input-phone').value.trim();
+  if (!phone) return;
+  setLoginError('');
+  const btn = document.getElementById('btn-send-code');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  const res = await api('/api/auth/phone','POST',{phone});
+  btn.disabled = false; btn.textContent = 'Enviar código';
+  if (res.ok) {
+    document.getElementById('login-phone-step').classList.add('hidden');
+    document.getElementById('login-code-step').classList.remove('hidden');
+    document.getElementById('input-code').focus();
+  } else { setLoginError(res.error||'Error al enviar código'); }
+}
+
+async function verifyCode() {
+  const code = document.getElementById('input-code').value.trim();
+  if (!code) return;
+  setLoginError('');
+  const btn = document.getElementById('btn-verify-code');
+  btn.disabled = true; btn.textContent = 'Verificando...';
+  const res = await api('/api/auth/code','POST',{code});
+  btn.disabled = false; btn.textContent = 'Verificar';
+  if (res.ok) showApp(); else setLoginError(res.error||'Código incorrecto');
+}
+
+function setLoginError(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = msg;
+  el.classList.toggle('hidden', !msg);
+}
+
+// ── VIEWS ─────────────────────────────────────────────────────────────────────
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const id = name === 'channel-detail' ? 'view-channel-detail' : `view-${name}`;
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+
+// ── CHANNELS ──────────────────────────────────────────────────────────────────
+let allChannels = [];
+
+async function loadChannels() {
+  const list = document.getElementById('channels-list');
+  list.innerHTML = '<div class="loading">Cargando canales...</div>';
+  const channels = await api('/api/channels');
+  if (channels.error) { list.innerHTML = `<div class="empty-state">${channels.error}</div>`; return; }
+  allChannels = channels;
+  renderChannels(channels);
+}
+
+function filterChannels() {
+  const q = document.getElementById('input-search-channels').value.toLowerCase();
+  renderChannels(allChannels.filter(c => c.title.toLowerCase().includes(q)));
+}
+
+function renderChannels(channels) {
+  const list = document.getElementById('channels-list');
+  if (!channels.length) { list.innerHTML = '<div class="empty-state">No se encontraron canales.</div>'; return; }
+  list.innerHTML = channels.map((c, i) => `
+    <div class="channel-card" data-id="${c.id}" data-title="${escHtml(c.title)}">
+      <div class="channel-avatar" style="background:${AVATAR_COLORS[i%AVATAR_COLORS.length]}">${c.title.charAt(0).toUpperCase()}</div>
+      <div class="channel-info">
+        <div class="channel-title">${escHtml(c.title)}</div>
+        <div class="channel-meta">${c.username?'@'+c.username:'Canal privado'}${c.participantsCount?' · '+c.participantsCount.toLocaleString()+' miembros':''}</div>
+      </div>
+      <span class="channel-arrow">›</span>
+    </div>`).join('');
+  list.querySelectorAll('.channel-card').forEach(card => {
+    card.onclick = () => openChannel(card.dataset.id, card.dataset.title);
+  });
+}
+
+// ── CHANNEL DETAIL ────────────────────────────────────────────────────────────
+async function openChannel(id, title) {
+  currentChannelId = id; currentChannelTitle = title;
+  document.getElementById('channel-detail-title').textContent = title;
+  document.getElementById('input-subfolder').value = sanitizeFolderName(title);
+  renderLocationButtons();
+  updatePathPreview();
+  document.getElementById('btn-start-download').disabled = true;
+  document.getElementById('chk-select-all').checked = false;
+  showView('channel-detail');
+  const list = document.getElementById('videos-list');
+  list.innerHTML = '<div class="loading">Cargando videos...</div>';
+  const res = await api(`/api/channels/${id}/videos`);
+  if (res.error) { list.innerHTML = `<div class="empty-state">${res.error}</div>`; return; }
+  const videos = res.videos.sort((a,b) => a.id - b.id);
+  if (!videos.length) { list.innerHTML = '<div class="empty-state">No hay videos en este canal.</div>'; return; }
+  list.innerHTML = videos.map((v,i) => `
+    <div class="video-row">
+      <input type="checkbox" class="video-chk" data-id="${v.id}">
+      <span class="video-num">#${String(i+1).padStart(3,'0')}</span>
+      <span class="video-caption">${v.caption ? escHtml(v.caption) : '<span class="no-caption">Sin título</span>'}</span>
+    </div>`).join('');
+  list.querySelectorAll('.video-chk').forEach(chk => { chk.onchange = updateDownloadBtn; });
+}
+
+function toggleSelectAll() {
+  const checked = document.getElementById('chk-select-all').checked;
+  document.querySelectorAll('.video-chk').forEach(c => c.checked = checked);
+  updateDownloadBtn();
+}
+
+function updateDownloadBtn() {
+  const count = document.querySelectorAll('.video-chk:checked').length;
+  const btn = document.getElementById('btn-start-download');
+  btn.disabled = count === 0;
+  btn.textContent = count > 0 ? `⬇️ Descargar (${count} seleccionados)` : '⬇️ Descargar seleccionados';
+}
+
+async function startDownload() {
+  const messageIds = [...document.querySelectorAll('.video-chk:checked')].map(c => parseInt(c.dataset.id));
+  const outputFolder = document.getElementById('input-subfolder').value.trim() || currentChannelTitle;
+  if (!messageIds.length) return;
+  const res = await api('/api/download','POST',{ channelId: currentChannelId, channelTitle: currentChannelTitle, messageIds, outputFolder, downloadPath: currentDownloadPath });
+  if (res.downloadId) {
+    toast(`Descarga iniciada (${messageIds.length} videos)`);
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-view="downloads"]').classList.add('active');
+    showView('downloads');
+  } else { toast('Error: ' + (res.error||'desconocido')); }
+}
+
+// ── DOWNLOADS ─────────────────────────────────────────────────────────────────
+function renderDownloads() {
+  const list = document.getElementById('downloads-list');
+  const all = Object.values(downloads);
+  if (!all.length) { list.innerHTML = '<div class="empty-state">No hay descargas activas.</div>'; return; }
+  const sorted = all.sort((a,b) => ({'running':0,'queued':1,'error':2,'completed':3}[a.status]??4) - ({'running':0,'queued':1,'error':2,'completed':3}[b.status]??4));
+  const statusLabel = { running:'Descargando', queued:'En cola', completed:'Completado', error:'Error' };
+  list.innerHTML = sorted.map(dl => {
+    const pct = dl.percent;
+    const fillClass = dl.status==='completed'?'completed':dl.status==='error'?'error':'';
+    const logHtml = dl.log.map(line => {
+      if (line.startsWith('[OK]')) return `<div class="log-ok">${escHtml(line)}</div>`;
+      if (line.startsWith('[SKIP]')) return `<div class="log-skip">${escHtml(line)}</div>`;
+      if (line.startsWith('[FAIL]')||line.startsWith('[ERROR]')) return `<div class="log-fail">${escHtml(line)}</div>`;
+      return `<div class="log-dl">${escHtml(line)}</div>`;
+    }).join('');
+    return `<div class="download-card" data-id="${dl.id}">
+      <div class="download-card-header">
+        <div class="download-title">${escHtml(dl.channelTitle||dl.channelId)}</div>
+        <span class="download-status status-${dl.status}">${statusLabel[dl.status]||dl.status}</span>
+      </div>
+      <div class="progress-bar-wrap"><div class="progress-bar-fill ${fillClass}" style="width:${pct}%"></div></div>
+      <div class="download-stats">
+        <span><b>${dl.done}</b> / ${dl.total} videos</span>
+        <span><b>${pct}%</b></span>
+        ${dl.failed?`<span style="color:var(--red)"><b>${dl.failed}</b> fallidos</span>`:''}
+        <span style="color:var(--muted)">${escHtml(dl.outDir)}</span>
+      </div>
+      <div class="download-log">${logHtml||'<span style="color:var(--muted)">Iniciando...</span>'}</div>
+      ${dl.status==='completed'||dl.status==='error'?`<div class="download-card-footer"><button class="btn-ghost btn-remove-dl" data-id="${dl.id}">Eliminar</button></div>`:''}
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.btn-remove-dl').forEach(btn => {
+    btn.onclick = async () => {
+      await api(`/api/downloads/${btn.dataset.id}`,'DELETE');
+      delete downloads[btn.dataset.id];
+      renderDownloads(); updateDownloadsBadge();
+    };
+  });
+  list.querySelectorAll('.download-log').forEach(log => { log.scrollTop = log.scrollHeight; });
+}
+
+async function clearCompleted() {
+  for (const dl of Object.values(downloads).filter(d => d.status==='completed'||d.status==='error')) {
+    await api(`/api/downloads/${dl.id}`,'DELETE');
+    delete downloads[dl.id];
+  }
+  renderDownloads(); updateDownloadsBadge();
+}
+
+function updateDownloadsBadge() {
+  const active = Object.values(downloads).filter(d => d.status==='running'||d.status==='queued').length;
+  const btn = document.querySelector('[data-view="downloads"]');
+  const ex = btn.querySelector('.badge'); if (ex) ex.remove();
+  if (active > 0) btn.insertAdjacentHTML('beforeend', `<span class="badge">${active}</span>`);
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function sanitizeFolderName(name) { return name.replace(/[<>:"/\\|?*]/g,'').trim(); }
+
+function updatePathPreview() {
+  const sub = document.getElementById('input-subfolder').value.trim();
+  const parts = [currentDownloadPath, sub || '…'].filter(Boolean);
+  document.getElementById('dest-preview').textContent = '📁 ' + parts.join('/');
+}
+
+async function loadAppConfig() {
+  const cfg = await api('/api/config');
+  if (!cfg.error) appConfig = cfg;
+}
+
+function renderLocationButtons() {
+  const container = document.getElementById('dest-locations');
+  container.innerHTML = MOCK_LOCATIONS.map(loc =>
+    `<button class="dest-loc-btn${loc.path === currentDownloadPath ? ' active' : ''}" data-path="${escHtml(loc.path)}">${escHtml(loc.name)}</button>`
+  ).join('');
+  container.querySelectorAll('.dest-loc-btn').forEach(btn => {
+    btn.onclick = () => {
+      currentDownloadPath = btn.dataset.path;
+      container.querySelectorAll('.dest-loc-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      updatePathPreview();
+    };
+  });
+}
+
+function loadSettings() {
+  const list = document.getElementById('settings-locations-list');
+  if (!list) return;
+  list.innerHTML = MOCK_LOCATIONS.map((loc, i) => `
+    <div class="settings-loc-item">
+      <div class="settings-loc-icon">📁</div>
+      <div class="settings-loc-info">
+        <div class="settings-loc-name">${escHtml(loc.name)}</div>
+        <div class="settings-loc-path">${escHtml(loc.path)}</div>
+      </div>
+      ${i === 0 ? '<span class="settings-loc-badge">Default</span>' : ''}
+    </div>`).join('');
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 3000);
+}
+</script>
+</body>
+</html>

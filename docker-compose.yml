@@ -1,7 +1,8 @@
+name: tldl
+
 services:
   tldl:
     image: ghcr.io/darkomg/tldl:latest
-    build: .
     container_name: tldl
     restart: unless-stopped
     ports:
@@ -9,8 +10,54 @@ services:
     environment:
       - API_ID=your_api_id_here
       - API_HASH=your_api_hash_here
-      - DATA_DIR=/data
+      - DATA_DIR=/DATA/AppData/tldl
       - DOWNLOADS_DIR=/downloads
     volumes:
-      - ./data:/data
+      - /DATA/AppData/tldl:/DATA/AppData/tldl
       - /DATA/.media/SSD1TERA:/downloads
+    x-casaos:
+      volumes:
+        - container: /DATA/AppData/tldl
+          description:
+            en_us: App data (session & credentials)
+        - container: /downloads
+          description:
+            en_us: Media download root
+      ports:
+        - container: "3000"
+          description:
+            en_us: Web UI
+          protocol: tcp
+      envs:
+        - container: API_ID
+          description:
+            en_us: Telegram API ID (from my.telegram.org)
+        - container: API_HASH
+          description:
+            en_us: Telegram API Hash (from my.telegram.org)
+        - container: DATA_DIR
+          description:
+            en_us: Directory to store session credentials
+        - container: DOWNLOADS_DIR
+          description:
+            en_us: Root directory for downloaded files
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  main: tldl
+  title:
+    en_us: TL;DL
+  tagline:
+    en_us: Download media from Telegram channels
+  description:
+    en_us: Self-hosted web UI for browsing and downloading media from Telegram channels. Supports videos, photos, audio, documents, and more. Built with GramJS.
+  icon: https://raw.githubusercontent.com/Darkomg/tldl/master/public/icon.svg
+  thumbnail: ""
+  developer: Darkomg
+  author: Darkomg
+  category: Utilities
+  port_map: "3000"
+  scheme: http
+  index: /

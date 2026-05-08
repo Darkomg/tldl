@@ -258,12 +258,14 @@ function renderMediaList(filter) {
   list.innerHTML = items.map((v, i) => {
     const label = v.caption ? escHtml(v.caption) : (v.filename ? escHtml(v.filename) : '<span class="no-caption">Sin título</span>');
     const badge = `<span class="media-badge media-badge-${v.mediaType || 'document'}">${v.mediaType || 'doc'}</span>`;
+    const sizeStr = v.size ? `<span class="file-size">${fmtBytes(v.size)}</span>` : '';
     return `
     <div class="video-row">
       <input type="checkbox" class="video-chk" data-id="${v.id}">
       <span class="video-num">#${String(i + 1).padStart(3, '0')}</span>
       ${badge}
       <span class="video-caption">${label}</span>
+      ${sizeStr}
     </div>`;
   }).join('');
 

@@ -294,6 +294,7 @@ nav { padding: 12px 8px; display: flex; flex-direction: column; gap: 4px; }
 .video-num { color: var(--muted); font-size: 12px; font-family: monospace; width: 40px; flex-shrink: 0; }
 .video-caption { flex: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .video-caption .no-caption { color: var(--muted); font-style: italic; }
+.file-size { color: var(--muted); font-size: 11px; font-family: monospace; flex-shrink: 0; margin-left: 6px; }
 .media-filter-bar {
   display: flex; gap: 6px; padding: 8px 24px; flex-shrink: 0;
   border-bottom: 1px solid var(--border); flex-wrap: wrap;

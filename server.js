@@ -262,6 +262,7 @@ app.get('/api/channels/:id/media', async (req, res) => {
           date: msg.date,
           mediaType: info.mediaType,
           filename: info.filename,
+          size: msg.media?.document?.size ? Number(msg.media.document.size) : 0,
         });
       }
       offsetId = messages[messages.length - 1].id;

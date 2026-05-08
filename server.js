@@ -54,6 +54,41 @@ function saveConfig(cfg) {
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
 }
 
+function getMediaInfo(msg) {
+  const m = msg.media;
+  if (!m) return null;
+
+  if (m.className === 'MessageMediaPhoto') {
+    return { mediaType: 'photo', filename: String(msg.id).padStart(5, '0') + '.jpg' };
+  }
+
+  if (m.className === 'MessageMediaDocument') {
+    const attrs = m.document.attributes || [];
+    const fnAttr    = attrs.find(a => a.className === 'DocumentAttributeFilename');
+    const vidAttr   = attrs.find(a => a.className === 'DocumentAttributeVideo');
+    const audAttr   = attrs.find(a => a.className === 'DocumentAttributeAudio');
+    const animAttr  = attrs.find(a => a.className === 'DocumentAttributeAnimated');
+    const stickAttr = attrs.find(a => a.className === 'DocumentAttributeSticker');
+
+    if (stickAttr) return null;
+
+    if (fnAttr) {
+      const ext = path.extname(fnAttr.fileName).toLowerCase();
+      const videoExts = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.ts'];
+      const audioExts = ['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.opus'];
+      const mediaType = videoExts.includes(ext) ? 'video' : audioExts.includes(ext) ? 'audio' : 'document';
+      return { mediaType, filename: fnAttr.fileName };
+    }
+    if (animAttr)          return { mediaType: 'gif',      filename: String(msg.id).padStart(5, '0') + '.mp4' };
+    if (vidAttr)           return { mediaType: 'video',    filename: String(msg.id).padStart(5, '0') + '.mp4' };
+    if (audAttr?.voice)    return { mediaType: 'voice',    filename: String(msg.id).padStart(5, '0') + '.ogg' };
+    if (audAttr)           return { mediaType: 'audio',    filename: String(msg.id).padStart(5, '0') + '.mp3' };
+    return                        { mediaType: 'document', filename: String(msg.id).padStart(5, '0') + '.bin' };
+  }
+
+  return null;
+}
+
 async function getClient() {
   if (tgClient && !tgClient.disconnected) return tgClient;
   const session = loadSession();
@@ -145,8 +180,8 @@ app.get('/api/channels', async (req, res) => {
   }
 });
 
-// ── Videos ───────────────────────────────────────────────────────────────────
-app.get('/api/channels/:id/videos', async (req, res) => {
+// ── Media ────────────────────────────────────────────────────────────────────
+app.get('/api/channels/:id/media', async (req, res) => {
   try {
     const client = await getClient();
     const bigInt = require('big-integer');
@@ -156,25 +191,27 @@ app.get('/api/channels/:id/videos', async (req, res) => {
     if (!dialog) return res.status(404).json({ error: 'Canal no encontrado' });
 
     const entity = dialog.entity;
-    const videos = [];
+    const media = [];
     let offsetId = 0;
 
     while (true) {
-      const messages = await client.getMessages(entity, {
-        limit: 100, offsetId, filter: new Api.InputMessagesFilterVideo()
-      });
+      const messages = await client.getMessages(entity, { limit: 100, offsetId });
       if (!messages || messages.length === 0) break;
       for (const msg of messages) {
-        videos.push({
+        const info = getMediaInfo(msg);
+        if (!info) continue;
+        media.push({
           id: msg.id,
           caption: (msg.message || '').trim(),
           date: msg.date,
+          mediaType: info.mediaType,
+          filename: info.filename,
         });
       }
       offsetId = messages[messages.length - 1].id;
     }
 
-    res.json({ channelId: req.params.id, title: entity.title, videos });
+    res.json({ channelId: req.params.id, title: entity.title, media });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -223,25 +260,32 @@ async function runDownload(id, channelId, messageIds, outDir) {
     fs.mkdirSync(outDir, { recursive: true });
 
     for (const msgId of messageIds) {
-      const filename = path.join(outDir, String(msgId).padStart(5, '0') + '.mp4');
-
-      if (fs.existsSync(filename)) {
-        dl.done++;
-        const entry = `[SKIP] ${path.basename(filename)}`;
-        dl.log.push(entry);
-        broadcast({ type: 'download_update', download: sanitizeDl(dl) });
-        continue;
-      }
-
+      let skipped = false;
       let success = false;
+
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           const msgs = await client.getMessages(entity, { ids: [msgId] });
           if (!msgs || !msgs[0]) throw new Error('Mensaje no encontrado');
-          const entry = `[DL] msg ${msgId} (intento ${attempt})`;
-          dl.log.push(entry);
+          const info = getMediaInfo(msgs[0]);
+          if (!info) { skipped = true; break; }
+
+          const filename = path.join(outDir, info.filename);
+
+          if (attempt === 1 && fs.existsSync(filename)) {
+            dl.done++;
+            dl.log.push(`[SKIP] ${info.filename}`);
+            broadcast({ type: 'download_update', download: sanitizeDl(dl) });
+            skipped = true;
+            break;
+          }
+
+          dl.log.push(`[DL] ${info.filename}${attempt > 1 ? ` (intento ${attempt})` : ''}`);
           broadcast({ type: 'download_update', download: sanitizeDl(dl) });
           await client.downloadMedia(msgs[0], { outputFile: filename });
+          dl.done++;
+          dl.log.push(`[OK] ${info.filename}`);
+          broadcast({ type: 'download_update', download: sanitizeDl(dl) });
           success = true;
           break;
         } catch (e) {
@@ -249,14 +293,11 @@ async function runDownload(id, channelId, messageIds, outDir) {
         }
       }
 
-      if (success) {
-        dl.done++;
-        dl.log.push(`[OK] ${path.basename(filename)}`);
-      } else {
+      if (!skipped && !success) {
         dl.failed++;
         dl.log.push(`[FAIL] msg ${msgId}`);
+        broadcast({ type: 'download_update', download: sanitizeDl(dl) });
       }
-      broadcast({ type: 'download_update', download: sanitizeDl(dl) });
     }
 
     dl.status = 'completed';

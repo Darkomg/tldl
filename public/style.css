@@ -294,6 +294,16 @@ nav { padding: 12px 8px; display: flex; flex-direction: column; gap: 4px; }
 .video-num { color: var(--muted); font-size: 12px; font-family: monospace; width: 40px; flex-shrink: 0; }
 .video-caption { flex: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .video-caption .no-caption { color: var(--muted); font-style: italic; }
+.media-badge {
+  font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+  text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; font-family: monospace;
+}
+.media-badge-video    { background: rgba(91,141,238,0.15);  color: var(--accent); }
+.media-badge-document { background: rgba(245,200,66,0.15);  color: var(--yellow); }
+.media-badge-photo    { background: rgba(61,214,140,0.15);  color: var(--green); }
+.media-badge-audio    { background: rgba(232,125,78,0.15);  color: #e87d4e; }
+.media-badge-voice    { background: rgba(232,125,78,0.15);  color: #e87d4e; }
+.media-badge-gif      { background: rgba(124,92,191,0.15);  color: #7c5cbf; }
 
 /* ── DOWNLOAD CARD ── */
 .download-card {

@@ -192,6 +192,13 @@
     .video-num { color: var(--muted); font-size: 12px; font-family: monospace; width: 40px; flex-shrink: 0; }
     .video-caption { flex: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .video-caption .no-caption { color: var(--muted); font-style: italic; }
+    .media-badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; font-family: monospace; }
+    .media-badge-video    { background: rgba(91,141,238,0.15);  color: var(--accent); }
+    .media-badge-document { background: rgba(245,200,66,0.15);  color: var(--yellow); }
+    .media-badge-photo    { background: rgba(61,214,140,0.15);  color: var(--green); }
+    .media-badge-audio    { background: rgba(232,125,78,0.15);  color: #e87d4e; }
+    .media-badge-voice    { background: rgba(232,125,78,0.15);  color: #e87d4e; }
+    .media-badge-gif      { background: rgba(124,92,191,0.15);  color: #7c5cbf; }
 
     .download-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 10px; }
     .download-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
@@ -376,22 +383,28 @@ const MOCK_CHANNELS = [
   { id: '1234567006', title: 'Ultraman Z Fansub', username: 'ultramanzfs', participantsCount: 2100 },
 ];
 
-function getMockVideos(channelId) {
+function getMockMedia(channelId) {
   if (channelId === '1683893058') {
     const v = [];
     for (let i = 1; i <= 51; i++)
-      v.push({ id: 60000 + i, caption: `[ULS&GF] Lupinranger VS Patranger - ${String(i).padStart(2,'0')}${i===51?' Final':''}`, date: 1600000000 + i*86400 });
-    v.push({ id: 60052, caption: '[ULS&GF] Lupinranger VS Patranger en Film', date: 1600000000+52*86400 });
-    v.push({ id: 60053, caption: '[ULS&GF] Another Patren 2gou', date: 1600000000+53*86400 });
-    v.push({ id: 60054, caption: '', date: 1600000000+54*86400 });
+      v.push({ id: 60000+i, caption: `[ULS&GF] Lupinranger VS Patranger - ${String(i).padStart(2,'0')}${i===51?' Final':''}`, date: 1600000000+i*86400, mediaType: 'document', filename: `[ULS&GF] LupVsPat - ${String(i).padStart(2,'0')}.mkv` });
+    v.push({ id: 60052, caption: '[ULS&GF] Lupinranger VS Patranger en Film', date: 1600000000+52*86400, mediaType: 'document', filename: '[ULS&GF] LupVsPat - Movie.mkv' });
+    v.push({ id: 60053, caption: '[ULS&GF] Another Patren 2gou', date: 1600000000+53*86400, mediaType: 'document', filename: '[ULS&GF] Another Patren 2gou.mkv' });
+    v.push({ id: 60054, caption: '', date: 1600000000+54*86400, mediaType: 'photo', filename: '60054.jpg' });
     return v;
   }
   const seed = parseInt(channelId.slice(-3));
-  return Array.from({ length: 12 + (seed % 8) }, (_, i) => ({
-    id: parseInt(channelId.slice(-6)) + i,
-    caption: `Episodio ${String(i+1).padStart(2,'0')}`,
-    date: 1600000000 + i*86400,
-  }));
+  return Array.from({ length: 12 + (seed % 8) }, (_, i) => {
+    const isPhoto = i % 7 === 6;
+    const isAudio = i % 9 === 8;
+    return {
+      id: parseInt(channelId.slice(-6)) + i,
+      caption: `Episodio ${String(i+1).padStart(2,'0')}`,
+      date: 1600000000 + i*86400,
+      mediaType: isPhoto ? 'photo' : isAudio ? 'audio' : 'video',
+      filename: `${String(parseInt(channelId.slice(-6))+i).padStart(5,'0')}.${isPhoto?'jpg':isAudio?'mp3':'mp4'}`,
+    };
+  });
 }
 
 // ── MOCK API ────────────────────────────────────────────────────────────────
@@ -409,11 +422,11 @@ async function api(url, method = 'GET', body = null) {
   if (url === '/api/locations') return MOCK_LOCATIONS;
   if (url === '/api/channels') return MOCK_CHANNELS;
 
-  const vm = url.match(/\/api\/channels\/([^/]+)\/videos/);
+  const vm = url.match(/\/api\/channels\/([^/]+)\/media/);
   if (vm) {
     await new Promise(r => setTimeout(r, 400 + Math.random() * 300));
     const ch = MOCK_CHANNELS.find(c => c.id === vm[1]);
-    return { channelId: vm[1], title: ch ? ch.title : 'Canal', videos: getMockVideos(vm[1]) };
+    return { channelId: vm[1], title: ch ? ch.title : 'Canal', media: getMockMedia(vm[1]) };
   }
 
   if (url === '/api/download' && method === 'POST') {
@@ -614,16 +627,20 @@ async function openChannel(id, title) {
   showView('channel-detail');
   const list = document.getElementById('videos-list');
   list.innerHTML = '<div class="loading">Cargando videos...</div>';
-  const res = await api(`/api/channels/${id}/videos`);
+  const res = await api(`/api/channels/${id}/media`);
   if (res.error) { list.innerHTML = `<div class="empty-state">${res.error}</div>`; return; }
-  const videos = res.videos.sort((a,b) => a.id - b.id);
-  if (!videos.length) { list.innerHTML = '<div class="empty-state">No hay videos en este canal.</div>'; return; }
-  list.innerHTML = videos.map((v,i) => `
-    <div class="video-row">
+  const videos = res.media.sort((a,b) => a.id - b.id);
+  if (!videos.length) { list.innerHTML = '<div class="empty-state">No hay archivos en este canal.</div>'; return; }
+  list.innerHTML = videos.map((v,i) => {
+    const label = v.caption ? escHtml(v.caption) : (v.filename ? escHtml(v.filename) : '<span class="no-caption">Sin título</span>');
+    const badge = `<span class="media-badge media-badge-${v.mediaType||'document'}">${v.mediaType||'doc'}</span>`;
+    return `<div class="video-row">
       <input type="checkbox" class="video-chk" data-id="${v.id}">
       <span class="video-num">#${String(i+1).padStart(3,'0')}</span>
-      <span class="video-caption">${v.caption ? escHtml(v.caption) : '<span class="no-caption">Sin título</span>'}</span>
-    </div>`).join('');
+      ${badge}
+      <span class="video-caption">${label}</span>
+    </div>`;
+  }).join('');
   list.querySelectorAll('.video-chk').forEach(chk => { chk.onchange = updateDownloadBtn; });
 }
 
@@ -637,7 +654,7 @@ function updateDownloadBtn() {
   const count = document.querySelectorAll('.video-chk:checked').length;
   const btn = document.getElementById('btn-start-download');
   btn.disabled = count === 0;
-  btn.textContent = count > 0 ? `⬇️ Descargar (${count} seleccionados)` : '⬇️ Descargar seleccionados';
+  btn.textContent = count > 0 ? `⬇️ Descargar (${count} archivos)` : '⬇️ Descargar seleccionados';
 }
 
 async function startDownload() {

@@ -193,19 +193,23 @@ async function openChannel(id, title) {
   const list = document.getElementById('videos-list');
   list.innerHTML = '<div class="loading">Cargando videos...</div>';
 
-  const res = await api(`/api/channels/${id}/videos`);
+  const res = await api(`/api/channels/${id}/media`);
   if (res.error) { list.innerHTML = `<div class="empty-state">${res.error}</div>`; return; }
 
-  const videos = res.videos.sort((a, b) => a.id - b.id);
-  if (!videos.length) { list.innerHTML = '<div class="empty-state">No hay videos en este canal.</div>'; return; }
+  const videos = res.media.sort((a, b) => a.id - b.id);
+  if (!videos.length) { list.innerHTML = '<div class="empty-state">No hay archivos en este canal.</div>'; return; }
 
-  list.innerHTML = videos.map((v, i) => `
+  list.innerHTML = videos.map((v, i) => {
+    const label = v.caption ? escHtml(v.caption) : (v.filename ? escHtml(v.filename) : '<span class="no-caption">Sin título</span>');
+    const badge = `<span class="media-badge media-badge-${v.mediaType || 'document'}">${v.mediaType || 'doc'}</span>`;
+    return `
     <div class="video-row">
       <input type="checkbox" class="video-chk" data-id="${v.id}">
       <span class="video-num">#${String(i + 1).padStart(3, '0')}</span>
-      <span class="video-caption">${v.caption ? escHtml(v.caption) : '<span class="no-caption">Sin título</span>'}</span>
-    </div>
-  `).join('');
+      ${badge}
+      <span class="video-caption">${label}</span>
+    </div>`;
+  }).join('');
 
   list.querySelectorAll('.video-chk').forEach(chk => {
     chk.onchange = updateDownloadBtn;
@@ -222,7 +226,7 @@ function updateDownloadBtn() {
   const count = document.querySelectorAll('.video-chk:checked').length;
   const btn = document.getElementById('btn-start-download');
   btn.disabled = count === 0;
-  btn.textContent = count > 0 ? `⬇️ Descargar (${count} seleccionados)` : '⬇️ Descargar seleccionados';
+  btn.textContent = count > 0 ? `⬇️ Descargar (${count} archivos)` : '⬇️ Descargar seleccionados';
 }
 
 async function startDownload() {

@@ -343,7 +343,7 @@ async function runDownload(id, channelId, messageIds, outDir) {
           await client.downloadMedia(msgs[0], {
             outputFile: filename,
             progressCallback: (received, total) => {
-              dl.fileProgress = total > 0 ? received / total : 0;
+              dl.fileProgress = total > 0 ? Number(received) / Number(total) : 0;
               const now = Date.now();
               if (now - lastBroadcast > 1500) {
                 lastBroadcast = now;

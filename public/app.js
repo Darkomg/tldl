@@ -44,13 +44,13 @@ async function api(url, method = 'GET', body = null) {
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 function showLogin() {
-  document.getElementById('screen-login').classList.remove('hidden');
-  document.getElementById('screen-app').classList.add('hidden');
+  document.getElementById('screen-login').classList.add('active');
+  document.getElementById('screen-app').classList.remove('active');
 }
 
 function showApp() {
-  document.getElementById('screen-login').classList.add('hidden');
-  document.getElementById('screen-app').classList.remove('hidden');
+  document.getElementById('screen-login').classList.remove('active');
+  document.getElementById('screen-app').classList.add('active');
   loadAppConfig();
   loadChannels();
 }

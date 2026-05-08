@@ -61,12 +61,15 @@ function bindEvents() {
   // Login
   document.getElementById('btn-send-code').onclick = sendPhone;
   document.getElementById('btn-verify-code').onclick = verifyCode;
+  document.getElementById('btn-verify-password').onclick = verifyPassword;
   document.getElementById('btn-back-phone').onclick = () => {
     document.getElementById('login-code-step').classList.add('hidden');
+    document.getElementById('login-password-step').classList.add('hidden');
     document.getElementById('login-phone-step').classList.remove('hidden');
   };
   document.getElementById('input-phone').addEventListener('keydown', e => { if (e.key === 'Enter') sendPhone(); });
   document.getElementById('input-code').addEventListener('keydown', e => { if (e.key === 'Enter') verifyCode(); });
+  document.getElementById('input-password').addEventListener('keydown', e => { if (e.key === 'Enter') verifyPassword(); });
 
   // Logout
   document.getElementById('btn-logout').onclick = async () => {
@@ -129,8 +132,28 @@ async function verifyCode() {
   const res = await api('/api/auth/code', 'POST', { code });
   document.getElementById('btn-verify-code').disabled = false;
   document.getElementById('btn-verify-code').textContent = 'Verificar';
+  if (res.ok) {
+    showApp();
+  } else if (res.needsPassword) {
+    document.getElementById('login-code-step').classList.add('hidden');
+    document.getElementById('login-password-step').classList.remove('hidden');
+    document.getElementById('input-password').focus();
+  } else {
+    setLoginError(res.error || 'Código incorrecto');
+  }
+}
+
+async function verifyPassword() {
+  const password = document.getElementById('input-password').value.trim();
+  if (!password) return;
+  setLoginError('');
+  document.getElementById('btn-verify-password').disabled = true;
+  document.getElementById('btn-verify-password').textContent = 'Verificando...';
+  const res = await api('/api/auth/password', 'POST', { password });
+  document.getElementById('btn-verify-password').disabled = false;
+  document.getElementById('btn-verify-password').textContent = 'Continuar';
   if (res.ok) showApp();
-  else setLoginError(res.error || 'Código incorrecto');
+  else setLoginError(res.error || 'Contraseña incorrecta');
 }
 
 function setLoginError(msg) {

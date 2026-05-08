@@ -23,9 +23,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ── State ────────────────────────────────────────────────────────────────────
 let tgClient = null;
-let pendingPhoneCodeHash = null;
-let pendingPhone = null;
 const downloads = {};  // id -> { id, channelTitle, files, done, total, failed, status, log[] }
+
+const authState = { codeResolve: null, codeReject: null, passwordResolve: null };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function loadSession() {
@@ -116,10 +116,37 @@ app.get('/api/auth/status', async (req, res) => {
 app.post('/api/auth/phone', async (req, res) => {
   const { phone } = req.body;
   try {
-    const client = await getClient();
-    const result = await client.sendCode({ apiId: API_ID, apiHash: API_HASH }, phone);
-    pendingPhoneCodeHash = result.phoneCodeHash;
-    pendingPhone = phone;
+    if (authState.codeReject) authState.codeReject(new Error('cancelled'));
+    authState.codeResolve = null;
+    authState.codeReject = null;
+    authState.passwordResolve = null;
+
+    if (tgClient) { try { await tgClient.destroy(); } catch {} tgClient = null; }
+
+    const session = loadSession();
+    tgClient = new TelegramClient(new StringSession(session), API_ID, API_HASH, { connectionRetries: 5 });
+    await tgClient.connect();
+
+    tgClient.start({
+      phoneNumber: async () => phone,
+      phoneCode: () => new Promise((resolve, reject) => {
+        authState.codeResolve = resolve;
+        authState.codeReject = reject;
+      }),
+      password: async () => new Promise(resolve => {
+        authState.passwordResolve = resolve;
+      }),
+      onError: err => console.error('Auth error:', err.message),
+    }).then(() => {
+      saveSession(tgClient.session.save());
+    }).catch(err => {
+      console.error('start() failed:', err.message);
+    });
+
+    // Wait for GramJS to reach the phoneCode callback
+    await new Promise(r => setTimeout(r, 2500));
+    if (!authState.codeResolve) return res.status(500).json({ error: 'No se pudo iniciar el flujo de auth' });
+
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -129,14 +156,37 @@ app.post('/api/auth/phone', async (req, res) => {
 app.post('/api/auth/code', async (req, res) => {
   const { code } = req.body;
   try {
-    const client = await getClient();
-    await client.invoke(new Api.auth.SignIn({
-      phoneNumber: pendingPhone,
-      phoneCodeHash: pendingPhoneCodeHash,
-      phoneCode: code,
-    }));
-    saveSession(await client.session.save());
-    res.json({ ok: true });
+    if (!authState.codeResolve) return res.status(400).json({ error: 'No hay auth pendiente. Solicita un nuevo código.' });
+    const resolve = authState.codeResolve;
+    authState.codeResolve = null;
+    authState.codeReject = null;
+    resolve(code);
+
+    await new Promise(r => setTimeout(r, 3000));
+
+    if (authState.passwordResolve) return res.json({ ok: false, needsPassword: true });
+
+    const authorized = await tgClient.isUserAuthorized();
+    if (authorized) return res.json({ ok: true });
+    res.status(400).json({ error: 'Código incorrecto' });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.post('/api/auth/password', async (req, res) => {
+  const { password } = req.body;
+  try {
+    if (!authState.passwordResolve) return res.status(400).json({ error: 'No hay 2FA pendiente.' });
+    const resolve = authState.passwordResolve;
+    authState.passwordResolve = null;
+    resolve(password);
+
+    await new Promise(r => setTimeout(r, 3000));
+
+    const authorized = await tgClient.isUserAuthorized();
+    if (authorized) return res.json({ ok: true });
+    res.status(400).json({ error: 'Contraseña incorrecta' });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }

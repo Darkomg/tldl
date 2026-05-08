@@ -339,8 +339,9 @@ function renderDownloads() {
           <div class="progress-bar-fill ${fillClass}" style="width:${pct}%"></div>
         </div>
         <div class="download-stats">
-          <span><b>${dl.done}</b> / ${dl.total} videos</span>
+          <span><b>${dl.done}</b> / ${dl.total} archivos</span>
           <span><b>${pct}%</b></span>
+          ${dl.expectedBytes > 0 ? `<span style="color:var(--muted)">${fmtBytes(dl.currentBytes)} / ${fmtBytes(dl.expectedBytes)}</span>` : ''}
           ${dl.failed ? `<span style="color:var(--red)"><b>${dl.failed}</b> fallidos</span>` : ''}
           <span style="color:var(--muted)">${escHtml(dl.outDir)}</span>
         </div>
@@ -392,6 +393,14 @@ function updateDownloadsBadge() {
   const existing = btn.querySelector('.badge');
   if (existing) existing.remove();
   if (active > 0) btn.insertAdjacentHTML('beforeend', `<span class="badge">${active}</span>`);
+}
+
+function fmtBytes(b) {
+  if (!b) return '0 B';
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+  return (b / 1073741824).toFixed(2) + ' GB';
 }
 
 // ── Utils ─────────────────────────────────────────────────────────────────────

@@ -343,30 +343,28 @@ async function runDownload(id, outDir) {
 
           dl.log.push(`[DL] ${info.filename}${attempt > 1 ? ` (intento ${attempt})` : ''}`);
           dl.fileProgress = 0;
+          dl.currentBytes = 0;
+          dl.expectedBytes = msgs[0].media?.document?.size ? Number(msgs[0].media.document.size) : 0;
           broadcast({ type: 'download_update', download: sanitizeDl(dl) });
 
-          // Get expected file size from Telegram metadata
-          const expectedSize = msgs[0].media?.document?.size
-            ? Number(msgs[0].media.document.size) : 0;
-
-          // Stream wrapper: tracks progress and supports cancel/pause
+          // Stream wrapper: counts bytes, tracks progress, supports cancel/pause
           let interrupted = null;
+          let chunkBytes = 0;
           const fileStream = fs.createWriteStream(filename);
           const outFile = {
             write: (chunk) => {
               if (dl.cancelled) { interrupted = 'cancelled'; throw new Error('cancelled'); }
               if (dl.paused)    { interrupted = 'paused';    throw new Error('paused'); }
+              chunkBytes += chunk.length;
+              dl.currentBytes = chunkBytes;
+              dl.fileProgress = dl.expectedBytes > 0 ? chunkBytes / dl.expectedBytes : 0;
               fileStream.write(chunk);
             },
           };
 
-          // Disk-polling interval for progress
+          // Broadcast progress every 1.5s
           const progressInterval = setInterval(() => {
-            try {
-              const written = fileStream.bytesWritten;
-              dl.fileProgress = expectedSize > 0 ? written / expectedSize : 0;
-              broadcast({ type: 'download_update', download: sanitizeDl(dl) });
-            } catch {}
+            broadcast({ type: 'download_update', download: sanitizeDl(dl) });
           }, 1500);
 
           try {
@@ -375,6 +373,8 @@ async function runDownload(id, outDir) {
             await new Promise((res, rej) => fileStream.end(err => err ? rej(err) : res()));
             dl.done++;
             dl.fileProgress = 0;
+            dl.currentBytes = 0;
+            dl.expectedBytes = 0;
             dl.log.push(`[OK] ${info.filename}`);
             broadcast({ type: 'download_update', download: sanitizeDl(dl) });
             success = true;
@@ -452,6 +452,8 @@ function sanitizeDl(dl) {
     status: dl.status, outDir: dl.outDir,
     log: dl.log.slice(-50),
     percent,
+    currentBytes: dl.currentBytes || 0,
+    expectedBytes: dl.expectedBytes || 0,
     canPause: dl.status === 'running' || dl.status === 'queued',
     canResume: dl.status === 'paused',
     canCancel: dl.status === 'running' || dl.status === 'queued' || dl.status === 'paused',

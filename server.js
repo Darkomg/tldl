@@ -292,14 +292,15 @@ app.post('/api/download', async (req, res) => {
     done: 0, failed: 0, fileProgress: 0,
     status: 'queued',
     outDir,
+    remainingIds: [...messageIds],
     log: [],
   };
 
   res.json({ downloadId: id });
-  runDownload(id, channelId, messageIds, outDir);
+  runDownload(id, outDir);
 });
 
-async function runDownload(id, channelId, messageIds, outDir) {
+async function runDownload(id, outDir) {
   const dl = downloads[id];
   dl.status = 'running';
   broadcast({ type: 'download_update', download: sanitizeDl(dl) });
@@ -307,7 +308,7 @@ async function runDownload(id, channelId, messageIds, outDir) {
   try {
     const client = await getClient();
     const bigInt = require('big-integer');
-    const cid = bigInt(channelId);
+    const cid = bigInt(dl.channelId);
     const dialogs = await client.getDialogs({ limit: 200 });
     const dialog = dialogs.find(d => d.entity && d.entity.id && d.entity.id.equals(cid));
     if (!dialog) throw new Error('Canal no encontrado');
@@ -315,7 +316,11 @@ async function runDownload(id, channelId, messageIds, outDir) {
 
     fs.mkdirSync(outDir, { recursive: true });
 
-    for (const msgId of messageIds) {
+    while (dl.remainingIds.length > 0) {
+      if (dl.cancelled) { dl.status = 'cancelled'; break; }
+      if (dl.paused)    { dl.status = 'paused';    break; }
+
+      const msgId = dl.remainingIds[0];
       let skipped = false;
       let success = false;
 
@@ -367,9 +372,11 @@ async function runDownload(id, channelId, messageIds, outDir) {
         dl.log.push(`[FAIL] msg ${msgId}`);
         broadcast({ type: 'download_update', download: sanitizeDl(dl) });
       }
+
+      if (!dl.paused && !dl.cancelled) dl.remainingIds.shift();
     }
 
-    dl.status = 'completed';
+    if (!dl.paused && !dl.cancelled) dl.status = 'completed';
   } catch (e) {
     dl.status = 'error';
     dl.log.push(`[ERROR] ${e.message}`);
@@ -380,6 +387,31 @@ async function runDownload(id, channelId, messageIds, outDir) {
 
 app.get('/api/downloads', (req, res) => {
   res.json(Object.values(downloads).map(sanitizeDl));
+});
+
+app.post('/api/downloads/:id/pause', (req, res) => {
+  const dl = downloads[req.params.id];
+  if (!dl) return res.status(404).json({ error: 'Not found' });
+  dl.paused = true;
+  res.json({ ok: true });
+});
+
+app.post('/api/downloads/:id/resume', (req, res) => {
+  const dl = downloads[req.params.id];
+  if (!dl) return res.status(404).json({ error: 'Not found' });
+  dl.paused = false;
+  dl.status = 'running';
+  broadcast({ type: 'download_update', download: sanitizeDl(dl) });
+  runDownload(dl.id, dl.outDir);
+  res.json({ ok: true });
+});
+
+app.post('/api/downloads/:id/cancel', (req, res) => {
+  const dl = downloads[req.params.id];
+  if (!dl) return res.status(404).json({ error: 'Not found' });
+  dl.cancelled = true;
+  dl.paused = false;
+  res.json({ ok: true });
 });
 
 app.delete('/api/downloads/:id', (req, res) => {
@@ -397,6 +429,9 @@ function sanitizeDl(dl) {
     status: dl.status, outDir: dl.outDir,
     log: dl.log.slice(-50),
     percent,
+    canPause: dl.status === 'running' || dl.status === 'queued',
+    canResume: dl.status === 'paused',
+    canCancel: dl.status === 'running' || dl.status === 'queued' || dl.status === 'paused',
   };
 }
 

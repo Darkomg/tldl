@@ -345,6 +345,8 @@ nav { padding: 12px 8px; display: flex; flex-direction: column; gap: 4px; }
 .status-completed { background: rgba(61,214,140,0.15); color: var(--green); }
 .status-error { background: rgba(224,92,92,0.15); color: var(--red); }
 .status-queued { background: rgba(245,200,66,0.15); color: var(--yellow); }
+.status-paused { background: rgba(245,200,66,0.15); color: var(--yellow); }
+.status-cancelled { background: rgba(123,128,153,0.15); color: var(--muted); }
 
 .progress-bar-wrap {
   background: var(--bg3);

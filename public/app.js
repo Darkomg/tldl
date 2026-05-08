@@ -321,7 +321,7 @@ function renderDownloads() {
   list.innerHTML = sorted.map(dl => {
     const pct = dl.percent;
     const fillClass = dl.status === 'completed' ? 'completed' : dl.status === 'error' ? 'error' : '';
-    const statusLabel = { running: 'Descargando', queued: 'En cola', completed: 'Completado', error: 'Error' }[dl.status] || dl.status;
+    const statusLabel = { running: 'Descargando', queued: 'En cola', completed: 'Completado', error: 'Error', paused: 'Pausado', cancelled: 'Cancelado' }[dl.status] || dl.status;
     const logHtml = dl.log.map(line => {
       if (line.startsWith('[OK]')) return `<div class="log-ok">${escHtml(line)}</div>`;
       if (line.startsWith('[SKIP]')) return `<div class="log-skip">${escHtml(line)}</div>`;
@@ -345,13 +345,24 @@ function renderDownloads() {
           <span style="color:var(--muted)">${escHtml(dl.outDir)}</span>
         </div>
         <div class="download-log">${logHtml || '<span style="color:var(--muted)">Iniciando...</span>'}</div>
-        ${dl.status === 'completed' || dl.status === 'error' ? `
-          <div class="download-card-footer">
-            <button class="btn-ghost btn-remove-dl" data-id="${dl.id}">Eliminar</button>
-          </div>` : ''}
+        <div class="download-card-footer">
+          ${dl.canPause  ? `<button class="btn-ghost btn-pause-dl"  data-id="${dl.id}">Pausar</button>` : ''}
+          ${dl.canResume ? `<button class="btn-ghost btn-resume-dl" data-id="${dl.id}">Reanudar</button>` : ''}
+          ${dl.canCancel ? `<button class="btn-ghost btn-cancel-dl" data-id="${dl.id}" style="color:var(--red)">Cancelar</button>` : ''}
+          ${dl.status === 'completed' || dl.status === 'error' || dl.status === 'cancelled' ? `<button class="btn-ghost btn-remove-dl" data-id="${dl.id}">Eliminar</button>` : ''}
+        </div>
       </div>`;
   }).join('');
 
+  list.querySelectorAll('.btn-pause-dl').forEach(btn => {
+    btn.onclick = () => api(`/api/downloads/${btn.dataset.id}/pause`, 'POST');
+  });
+  list.querySelectorAll('.btn-resume-dl').forEach(btn => {
+    btn.onclick = () => api(`/api/downloads/${btn.dataset.id}/resume`, 'POST');
+  });
+  list.querySelectorAll('.btn-cancel-dl').forEach(btn => {
+    btn.onclick = () => api(`/api/downloads/${btn.dataset.id}/cancel`, 'POST');
+  });
   list.querySelectorAll('.btn-remove-dl').forEach(btn => {
     btn.onclick = async () => {
       await api(`/api/downloads/${btn.dataset.id}`, 'DELETE');

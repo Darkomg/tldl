@@ -14,7 +14,7 @@ services:
       - DOWNLOADS_DIR=/downloads
     volumes:
       - /DATA/AppData/tldl:/DATA/AppData/tldl
-      - /DATA/.media/SSD1TERA:/downloads
+      - /DATA/.media/SSD1TERA/Download:/downloads
     x-casaos:
       volumes:
         - container: /DATA/AppData/tldl

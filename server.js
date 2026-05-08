@@ -444,9 +444,9 @@ app.delete('/api/downloads/:id', (req, res) => {
 });
 
 function sanitizeDl(dl) {
-  const percent = dl.total > 0
-    ? Math.round(((dl.done + (dl.fileProgress || 0)) / dl.total) * 100)
-    : 0;
+  const percent = (dl.status === 'running' && (dl.fileProgress || 0) > 0)
+    ? Math.round((dl.fileProgress || 0) * 100)
+    : (dl.total > 0 ? Math.round((dl.done / dl.total) * 100) : 0);
   return {
     id: dl.id, channelId: dl.channelId, channelTitle: dl.channelTitle,
     total: dl.total, done: dl.done, failed: dl.failed,

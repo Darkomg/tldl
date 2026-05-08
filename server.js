@@ -289,7 +289,7 @@ app.post('/api/download', async (req, res) => {
   downloads[id] = {
     id, channelId, channelTitle,
     total: messageIds.length,
-    done: 0, failed: 0,
+    done: 0, failed: 0, fileProgress: 0,
     status: 'queued',
     outDir,
     log: [],
@@ -337,9 +337,22 @@ async function runDownload(id, channelId, messageIds, outDir) {
           }
 
           dl.log.push(`[DL] ${info.filename}${attempt > 1 ? ` (intento ${attempt})` : ''}`);
+          dl.fileProgress = 0;
           broadcast({ type: 'download_update', download: sanitizeDl(dl) });
-          await client.downloadMedia(msgs[0], { outputFile: filename });
+          let lastBroadcast = Date.now();
+          await client.downloadMedia(msgs[0], {
+            outputFile: filename,
+            progressCallback: (received, total) => {
+              dl.fileProgress = total > 0 ? received / total : 0;
+              const now = Date.now();
+              if (now - lastBroadcast > 1500) {
+                lastBroadcast = now;
+                broadcast({ type: 'download_update', download: sanitizeDl(dl) });
+              }
+            },
+          });
           dl.done++;
+          dl.fileProgress = 0;
           dl.log.push(`[OK] ${info.filename}`);
           broadcast({ type: 'download_update', download: sanitizeDl(dl) });
           success = true;
@@ -375,12 +388,15 @@ app.delete('/api/downloads/:id', (req, res) => {
 });
 
 function sanitizeDl(dl) {
+  const percent = dl.total > 0
+    ? Math.round(((dl.done + (dl.fileProgress || 0)) / dl.total) * 100)
+    : 0;
   return {
     id: dl.id, channelId: dl.channelId, channelTitle: dl.channelTitle,
     total: dl.total, done: dl.done, failed: dl.failed,
     status: dl.status, outDir: dl.outDir,
     log: dl.log.slice(-50),
-    percent: dl.total > 0 ? Math.round((dl.done / dl.total) * 100) : 0,
+    percent,
   };
 }
 

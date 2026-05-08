@@ -1,6 +1,6 @@
 services:
   telegram-downloader:
-    image: telegram-downloader
+    image: ghcr.io/darkomg/telegram-downloader:latest
     build: .
     container_name: telegram-downloader
     restart: unless-stopped

@@ -352,7 +352,7 @@ function renderDownloads() {
           <div class="download-title">${escHtml(dl.channelTitle || dl.channelId)}</div>
           <span class="download-status status-${dl.status}">${statusLabel}</span>
         </div>
-        <div class="progress-label">Archivo actual <span>${dl.filePercent}%${dl.expectedBytes > 0 ? ` — ${fmtBytes(dl.currentBytes)} / ${fmtBytes(dl.expectedBytes)}` : ''}</span></div>
+        <div class="progress-label">Archivo actual <span>${dl.filePercent}%${dl.expectedBytes > 0 ? ` — ${fmtBytes(dl.currentBytes)} / ${fmtBytes(dl.expectedBytes)}` : ''}${dl.speedBytesPerSec > 0 && dl.status === 'running' ? ` · ${fmtSpeed(dl.speedBytesPerSec)}` : ''}</span></div>
         <div class="progress-bar-wrap">
           <div class="progress-bar-fill" style="width:${dl.filePercent}%"></div>
         </div>
@@ -365,6 +365,7 @@ function renderDownloads() {
           ${dl.canPause  ? `<button class="btn-ghost btn-pause-dl"  data-id="${dl.id}">Pausar</button>` : ''}
           ${dl.canResume ? `<button class="btn-ghost btn-resume-dl" data-id="${dl.id}">Reanudar</button>` : ''}
           ${dl.canCancel ? `<button class="btn-ghost btn-cancel-dl" data-id="${dl.id}" style="color:var(--red)">Cancelar</button>` : ''}
+          ${dl.canRetry ? `<button class="btn-ghost btn-retry-dl" data-id="${dl.id}" style="color:var(--accent)">↺ Reintentar fallidos</button>` : ''}
           ${dl.status === 'completed' || dl.status === 'error' || dl.status === 'cancelled' ? `<button class="btn-ghost btn-remove-dl" data-id="${dl.id}">Eliminar</button>` : ''}
         </div>
       </div>`;
@@ -378,6 +379,9 @@ function renderDownloads() {
   });
   list.querySelectorAll('.btn-cancel-dl').forEach(btn => {
     btn.onclick = () => api(`/api/downloads/${btn.dataset.id}/cancel`, 'POST');
+  });
+  list.querySelectorAll('.btn-retry-dl').forEach(btn => {
+    btn.onclick = () => api(`/api/downloads/${btn.dataset.id}/retry`, 'POST');
   });
   list.querySelectorAll('.btn-remove-dl').forEach(btn => {
     btn.onclick = async () => {
@@ -408,6 +412,13 @@ function updateDownloadsBadge() {
   const existing = btn.querySelector('.badge');
   if (existing) existing.remove();
   if (active > 0) btn.insertAdjacentHTML('beforeend', `<span class="badge">${active}</span>`);
+}
+
+function fmtSpeed(bps) {
+  if (!bps || bps <= 0) return '';
+  if (bps < 1024) return bps + ' B/s';
+  if (bps < 1048576) return (bps / 1024).toFixed(1) + ' KB/s';
+  return (bps / 1048576).toFixed(1) + ' MB/s';
 }
 
 function fmtBytes(b) {

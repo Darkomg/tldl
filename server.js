@@ -367,6 +367,7 @@ async function runDownload(id, outDir) {
           dl.fileProgress = 0;
           dl.currentBytes = 0;
           dl.expectedBytes = fileEntry?.size || 0;
+          dl.speedBytesPerSec = 0;
           broadcast({ type: 'download_update', download: sanitizeDl(dl) });
 
           let interrupted = null;
@@ -384,7 +385,16 @@ async function runDownload(id, outDir) {
             },
           };
 
+          let lastSpeedTime = Date.now();
+          let lastSpeedBytes = 0;
           const progressInterval = setInterval(() => {
+            const now = Date.now();
+            const elapsed = (now - lastSpeedTime) / 1000;
+            if (elapsed > 0) {
+              dl.speedBytesPerSec = Math.round((dl.currentBytes - lastSpeedBytes) / elapsed);
+              lastSpeedTime = now;
+              lastSpeedBytes = dl.currentBytes;
+            }
             broadcast({ type: 'download_update', download: sanitizeDl(dl) });
           }, 1500);
 
@@ -397,11 +407,13 @@ async function runDownload(id, outDir) {
             dl.fileProgress = 0;
             dl.currentBytes = 0;
             dl.expectedBytes = 0;
+            dl.speedBytesPerSec = 0;
             dl.log.push(`[OK] ${info.filename}`);
             broadcast({ type: 'download_update', download: sanitizeDl(dl) });
             success = true; break;
           } catch (e) {
             clearInterval(progressInterval);
+            dl.speedBytesPerSec = 0;
             try { fileStream.destroy(); fs.unlinkSync(filename); } catch {}
             if (interrupted) {
               if (fileEntry) fileEntry.status = 'pending';
@@ -462,6 +474,22 @@ app.post('/api/downloads/:id/cancel', (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/api/downloads/:id/retry', (req, res) => {
+  const dl = downloads[req.params.id];
+  if (!dl) return res.status(404).json({ error: 'Not found' });
+  const failedFiles = dl.files.filter(f => f.status === 'failed');
+  if (!failedFiles.length) return res.status(400).json({ error: 'No hay archivos fallidos' });
+  failedFiles.forEach(f => { f.status = 'pending'; f.bytes = 0; });
+  dl.remainingIds = failedFiles.map(f => f.id);
+  dl.failed = 0;
+  dl.cancelled = false;
+  dl.paused = false;
+  dl.status = 'queued';
+  broadcast({ type: 'download_update', download: sanitizeDl(dl) });
+  runDownload(dl.id, dl.outDir);
+  res.json({ ok: true });
+});
+
 app.delete('/api/downloads/:id', (req, res) => {
   delete downloads[req.params.id];
   res.json({ ok: true });
@@ -481,9 +509,11 @@ function sanitizeDl(dl) {
     currentBytes: dl.currentBytes || 0,
     expectedBytes: dl.expectedBytes || 0,
     files: dl.files || [],
+    speedBytesPerSec: dl.speedBytesPerSec || 0,
     canPause: dl.status === 'running' || dl.status === 'queued',
     canResume: dl.status === 'paused',
     canCancel: dl.status === 'running' || dl.status === 'queued' || dl.status === 'paused',
+    canRetry: (dl.status === 'completed' || dl.status === 'error') && (dl.files || []).some(f => f.status === 'failed'),
   };
 }
 

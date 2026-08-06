@@ -101,6 +101,7 @@ function bindEvents() {
     currentMediaFormat = e.target.value;
     renderMediaList(currentMediaFilter);
   };
+  initColumnResize();
   document.getElementById('input-subfolder').addEventListener('input', updatePathPreview);
   document.getElementById('input-downloads-root').addEventListener('input', () => {
     const v = document.getElementById('input-downloads-root').value.trim();
@@ -239,6 +240,35 @@ async function openChannel(id, title) {
   renderMediaList('all');
 }
 
+function initColumnResize() {
+  const wrapper = document.getElementById('video-table-wrapper');
+  const header = document.getElementById('video-table-header');
+  let dragCol = null, startX = 0, startWidth = 0, handleEl = null;
+
+  header.querySelectorAll('.col-resize-handle').forEach(handle => {
+    handle.addEventListener('mousedown', e => {
+      e.preventDefault();
+      dragCol = handle.dataset.col;
+      startX = e.clientX;
+      startWidth = parseInt(getComputedStyle(wrapper).getPropertyValue(`--w-${dragCol}`)) || 100;
+      handleEl = handle;
+      handleEl.classList.add('resizing');
+    });
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragCol) return;
+    const newWidth = Math.max(40, startWidth + (e.clientX - startX));
+    wrapper.style.setProperty(`--w-${dragCol}`, `${newWidth}px`);
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (handleEl) handleEl.classList.remove('resizing');
+    dragCol = null;
+    handleEl = null;
+  });
+}
+
 function getFileExtension(filename) {
   if (!filename) return '';
   const parts = filename.split('.');
@@ -298,16 +328,16 @@ function renderMediaList(filter) {
   list.innerHTML = items.map((v, i) => {
     const label = v.caption ? escHtml(v.caption) : (v.filename ? escHtml(v.filename) : '<span class="no-caption">Sin título</span>');
     const badge = `<span class="media-badge media-badge-${v.mediaType || 'document'}">${v.mediaType || 'doc'}</span>`;
-    const sizeStr = v.size ? `<span class="file-size">${fmtBytes(v.size)}</span>` : '';
-    const filenameStr = v.filename ? `<span class="video-filename">${escHtml(v.filename)}</span>` : '';
+    const sizeStr = v.size ? fmtBytes(v.size) : '';
+    const filenameStr = v.filename ? escHtml(v.filename) : '';
     return `
     <div class="video-row">
-      <input type="checkbox" class="video-chk" data-id="${v.id}">
-      <span class="video-num">#${String(i + 1).padStart(3, '0')}</span>
-      ${badge}
-      <span class="video-caption">${label}</span>
-      ${filenameStr}
-      ${sizeStr}
+      <span class="col-chk"><input type="checkbox" class="video-chk" data-id="${v.id}"></span>
+      <span class="col-num">#${String(i + 1).padStart(3, '0')}</span>
+      <span class="col-type">${badge}</span>
+      <span class="col-name video-caption" title="${v.caption ? escHtml(v.caption) : ''}">${label}</span>
+      <span class="col-filename" title="${filenameStr}">${filenameStr}</span>
+      <span class="col-size">${sizeStr}</span>
     </div>`;
   }).join('');
 

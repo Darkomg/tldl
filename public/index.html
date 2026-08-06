@@ -114,9 +114,19 @@
             <option value="all">Todos los formatos</option>
           </select>
         </div>
-      <div id="videos-list" class="list-container">
+      <div id="video-table-wrapper" class="video-table-wrapper">
+        <div id="video-table-header" class="video-row video-header-row">
+          <span class="col-chk"></span>
+          <span class="col-num">#</span>
+          <span class="col-type" data-col="type">Tipo<span class="col-resize-handle" data-col="type"></span></span>
+          <span class="col-name" data-col="name">Nombre<span class="col-resize-handle" data-col="name"></span></span>
+          <span class="col-filename" data-col="filename">Nombre de archivo<span class="col-resize-handle" data-col="filename"></span></span>
+          <span class="col-size" data-col="size">Tamaño<span class="col-resize-handle" data-col="size"></span></span>
+        </div>
+        <div id="videos-list" class="list-container">
           <div class="loading">Cargando...</div>
         </div>
+      </div>
       </div>
 
       <!-- SETTINGS VIEW -->

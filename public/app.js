@@ -3,6 +3,8 @@ let currentChannelId = null;
 let currentChannelTitle = null;
 let currentMediaList = [];
 let currentMediaFilter = 'all';
+let currentMediaFormat = 'all';
+let currentMediaSearch = '';
 let ws = null;
 let downloads = {};
 let appConfig = {};
@@ -91,6 +93,14 @@ function bindEvents() {
 
   // Videos
   document.getElementById('chk-select-all').onchange = toggleSelectAll;
+  document.getElementById('input-media-search').oninput = e => {
+    currentMediaSearch = e.target.value.trim().toLowerCase();
+    renderMediaList(currentMediaFilter);
+  };
+  document.getElementById('select-media-format').onchange = e => {
+    currentMediaFormat = e.target.value;
+    renderMediaList(currentMediaFilter);
+  };
   document.getElementById('input-subfolder').addEventListener('input', updatePathPreview);
   document.getElementById('input-downloads-root').addEventListener('input', () => {
     const v = document.getElementById('input-downloads-root').value.trim();
@@ -214,15 +224,38 @@ async function openChannel(id, title) {
   showView('channel-detail');
 
   const list = document.getElementById('videos-list');
-  list.innerHTML = '<div class="loading">Cargando videos...</div>';
+  list.innerHTML = '<div class="loading">Cargando...</div>';
 
   const res = await api(`/api/channels/${id}/media`);
   if (res.error) { list.innerHTML = `<div class="empty-state">${res.error}</div>`; return; }
 
   currentMediaList = res.media.sort((a, b) => a.id - b.id);
   currentMediaFilter = 'all';
+  currentMediaFormat = 'all';
+  currentMediaSearch = '';
+  document.getElementById('input-media-search').value = '';
   renderFilterButtons();
+  renderFormatSelect();
   renderMediaList('all');
+}
+
+function getFileExtension(filename) {
+  if (!filename) return '';
+  const parts = filename.split('.');
+  return parts.length > 1 ? parts.pop().toLowerCase() : '';
+}
+
+function renderFormatSelect() {
+  const select = document.getElementById('select-media-format');
+  const counts = {};
+  currentMediaList.forEach(v => {
+    const ext = getFileExtension(v.filename);
+    if (ext) counts[ext] = (counts[ext] || 0) + 1;
+  });
+  const exts = Object.keys(counts).sort();
+  select.innerHTML = `<option value="all">Todos los formatos</option>` +
+    exts.map(ext => `<option value="${ext}">${ext.toUpperCase()} (${counts[ext]})</option>`).join('');
+  select.value = 'all';
 }
 
 function renderFilterButtons() {
@@ -245,11 +278,18 @@ function renderMediaList(filter) {
   currentMediaFilter = filter;
   document.querySelectorAll('.media-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === filter));
 
-  const items = filter === 'all' ? currentMediaList : currentMediaList.filter(v => v.mediaType === filter);
+  let items = filter === 'all' ? currentMediaList : currentMediaList.filter(v => v.mediaType === filter);
+  if (currentMediaFormat !== 'all') items = items.filter(v => getFileExtension(v.filename) === currentMediaFormat);
+  if (currentMediaSearch) {
+    items = items.filter(v =>
+      (v.caption && v.caption.toLowerCase().includes(currentMediaSearch)) ||
+      (v.filename && v.filename.toLowerCase().includes(currentMediaSearch))
+    );
+  }
   const list = document.getElementById('videos-list');
 
   if (!items.length) {
-    list.innerHTML = '<div class="empty-state">No hay archivos de este tipo.</div>';
+    list.innerHTML = '<div class="empty-state">No hay archivos que coincidan.</div>';
     document.getElementById('chk-select-all').checked = false;
     updateDownloadBtn();
     return;
@@ -259,12 +299,14 @@ function renderMediaList(filter) {
     const label = v.caption ? escHtml(v.caption) : (v.filename ? escHtml(v.filename) : '<span class="no-caption">Sin título</span>');
     const badge = `<span class="media-badge media-badge-${v.mediaType || 'document'}">${v.mediaType || 'doc'}</span>`;
     const sizeStr = v.size ? `<span class="file-size">${fmtBytes(v.size)}</span>` : '';
+    const filenameStr = v.filename ? `<span class="video-filename">${escHtml(v.filename)}</span>` : '';
     return `
     <div class="video-row">
       <input type="checkbox" class="video-chk" data-id="${v.id}">
       <span class="video-num">#${String(i + 1).padStart(3, '0')}</span>
       ${badge}
       <span class="video-caption">${label}</span>
+      ${filenameStr}
       ${sizeStr}
     </div>`;
   }).join('');

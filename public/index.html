@@ -107,9 +107,15 @@
             <button id="btn-start-download" class="btn-primary" disabled>⬇️ Descargar seleccionados</button>
           </div>
         </div>
-        <div id="media-filter-bar" class="media-filter-bar"></div>
+        <div id="media-toolbar" class="media-toolbar">
+          <input id="input-media-search" type="text" placeholder="Buscar por nombre o título...">
+          <div id="media-filter-bar" class="media-filter-bar"></div>
+          <select id="select-media-format" class="media-format-select">
+            <option value="all">Todos los formatos</option>
+          </select>
+        </div>
       <div id="videos-list" class="list-container">
-          <div class="loading">Cargando videos...</div>
+          <div class="loading">Cargando...</div>
         </div>
       </div>
 

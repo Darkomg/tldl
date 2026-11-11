@@ -229,6 +229,7 @@ app.get('/api/channels', async (req, res) => {
         title: d.title || d.name || '',
         username: d.entity.username || null,
         participantsCount: d.entity.participantsCount || null,
+        forum: !!d.entity.forum,
       }));
     res.json(channels);
   } catch (e) {
@@ -236,7 +237,47 @@ app.get('/api/channels', async (req, res) => {
   }
 });
 
+// ── Topics (forum groups) ────────────────────────────────────────────────────
+app.get('/api/channels/:id/topics', async (req, res) => {
+  try {
+    const client = await getClient();
+    const bigInt = require('big-integer');
+    const channelId = bigInt(req.params.id);
+    const dialogs = await client.getDialogs({ limit: 200 });
+    const dialog = dialogs.find(d => d.entity && d.entity.id && d.entity.id.equals(channelId));
+    if (!dialog) return res.status(404).json({ error: 'Canal no encontrado' });
+    if (!dialog.entity.forum) return res.json({ channelId: req.params.id, topics: [] });
+
+    const topics = [];
+    let offsetDate = 0, offsetId = 0, offsetTopic = 0;
+
+    while (true) {
+      const result = await client.invoke(new Api.channels.GetForumTopics({
+        channel: dialog.entity, offsetDate, offsetId, offsetTopic, limit: 100,
+      }));
+      const batch = (result.topics || []).filter(t => t.className === 'ForumTopic');
+      if (!batch.length) break;
+      for (const t of batch) {
+        topics.push({ id: t.id, title: t.title, closed: !!t.closed, pinned: !!t.pinned });
+      }
+      if (topics.length >= result.count) break;
+      const last = batch[batch.length - 1];
+      const lastMsg = (result.messages || []).find(m => m.id === last.topMessage);
+      offsetDate = lastMsg ? lastMsg.date : last.date;
+      offsetId = last.topMessage;
+      offsetTopic = last.id;
+    }
+
+    res.json({ channelId: req.params.id, topics });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Media ────────────────────────────────────────────────────────────────────
+// Optional ?topic=<id> restricts results to one forum topic. Topic 1 is the
+// "General" topic, which can't be queried via replies, so its messages are
+// found by excluding everything that belongs to another topic.
 app.get('/api/channels/:id/media', async (req, res) => {
   try {
     const client = await getClient();
@@ -247,13 +288,18 @@ app.get('/api/channels/:id/media', async (req, res) => {
     if (!dialog) return res.status(404).json({ error: 'Canal no encontrado' });
 
     const entity = dialog.entity;
+    const topicId = req.query.topic ? parseInt(req.query.topic) : null;
+    const isGeneralTopic = topicId === 1;
     const media = [];
     let offsetId = 0;
 
     while (true) {
-      const messages = await client.getMessages(entity, { limit: 100, offsetId });
+      const opts = { limit: 100, offsetId };
+      if (topicId && !isGeneralTopic) opts.replyTo = topicId;
+      const messages = await client.getMessages(entity, opts);
       if (!messages || messages.length === 0) break;
       for (const msg of messages) {
+        if (isGeneralTopic && msg.replyTo && msg.replyTo.forumTopic) continue;
         const info = getMediaInfo(msg);
         if (!info) continue;
         media.push({

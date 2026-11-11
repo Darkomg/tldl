@@ -1,6 +1,7 @@
 // ── State ────────────────────────────────────────────────────────────────────
 let currentChannelId = null;
 let currentChannelTitle = null;
+let currentTopic = null;
 let currentMediaList = [];
 let currentMediaFilter = 'all';
 let currentMediaFormat = 'all';
@@ -89,7 +90,9 @@ function bindEvents() {
   // Channels
   document.getElementById('btn-refresh-channels').onclick = loadChannels;
   document.getElementById('input-search-channels').oninput = filterChannels;
-  document.getElementById('btn-back-channels').onclick = () => showView('channels');
+  document.getElementById('btn-back-channels').onclick = () => showView(currentTopic ? 'topics' : 'channels');
+  document.getElementById('btn-back-topics').onclick = () => showView('channels');
+  document.getElementById('input-search-topics').oninput = filterTopics;
 
   // Videos
   document.getElementById('chk-select-all').onchange = toggleSelectAll;
@@ -203,22 +206,80 @@ function renderChannels(channels) {
       <div class="channel-avatar">${c.title.charAt(0).toUpperCase()}</div>
       <div class="channel-info">
         <div class="channel-title">${escHtml(c.title)}</div>
-        <div class="channel-meta">${c.username ? '@' + c.username : 'Canal privado'}${c.participantsCount ? ' · ' + c.participantsCount.toLocaleString() + ' miembros' : ''}</div>
+        <div class="channel-meta">${c.username ? '@' + c.username : 'Canal privado'}${c.participantsCount ? ' · ' + c.participantsCount.toLocaleString() + ' miembros' : ''}${c.forum ? ' · 🗂 Temas' : ''}</div>
       </div>
       <span class="channel-arrow">›</span>
     </div>
   `).join('');
   list.querySelectorAll('.channel-card').forEach(card => {
-    card.onclick = () => openChannel(card.dataset.id, card.dataset.title);
+    const channel = channels.find(c => c.id === card.dataset.id);
+    card.onclick = () => channel && channel.forum
+      ? openTopics(card.dataset.id, card.dataset.title)
+      : openChannel(card.dataset.id, card.dataset.title);
+  });
+}
+
+// ── Topics (forum groups) ─────────────────────────────────────────────────────
+let allTopics = [];
+
+async function openTopics(id, title) {
+  currentChannelId = id;
+  currentChannelTitle = title;
+  document.getElementById('topics-title').textContent = title;
+  document.getElementById('input-search-topics').value = '';
+  showView('topics');
+
+  const list = document.getElementById('topics-list');
+  list.innerHTML = '<div class="loading">Cargando temas...</div>';
+
+  const res = await api(`/api/channels/${id}/topics`);
+  if (res.error) { list.innerHTML = `<div class="empty-state">${res.error}</div>`; return; }
+  allTopics = res.topics;
+  renderTopics(allTopics);
+}
+
+function filterTopics() {
+  const q = document.getElementById('input-search-topics').value.toLowerCase();
+  renderTopics(allTopics.filter(t => t.title.toLowerCase().includes(q)));
+}
+
+function renderTopics(topics) {
+  const list = document.getElementById('topics-list');
+  const allCard = `
+    <div class="channel-card" data-topic="">
+      <div class="channel-avatar">★</div>
+      <div class="channel-info">
+        <div class="channel-title">Todos los temas</div>
+        <div class="channel-meta">Media de todo el grupo</div>
+      </div>
+      <span class="channel-arrow">›</span>
+    </div>`;
+  list.innerHTML = allCard + topics.map(t => `
+    <div class="channel-card" data-topic="${t.id}" data-title="${escHtml(t.title)}">
+      <div class="channel-avatar">${escHtml(t.title.charAt(0).toUpperCase())}</div>
+      <div class="channel-info">
+        <div class="channel-title">${escHtml(t.title)}</div>
+        <div class="channel-meta">${t.pinned ? '📌 Fijado' : 'Tema'}${t.closed ? ' · 🔒 Cerrado' : ''}</div>
+      </div>
+      <span class="channel-arrow">›</span>
+    </div>
+  `).join('');
+  list.querySelectorAll('.channel-card').forEach(card => {
+    card.onclick = () => openChannel(currentChannelId, currentChannelTitle,
+      card.dataset.topic ? { id: parseInt(card.dataset.topic), title: card.dataset.title } : { id: null, title: null });
   });
 }
 
 // ── Channel Detail ────────────────────────────────────────────────────────────
-async function openChannel(id, title) {
+// `topic` is set when browsing a forum group: { id, title }, where a null id
+// means "all topics". It is null for regular channels.
+async function openChannel(id, title, topic = null) {
   currentChannelId = id;
   currentChannelTitle = title;
-  document.getElementById('channel-detail-title').textContent = title;
-  document.getElementById('input-subfolder').value = sanitizeFolderName(title);
+  currentTopic = topic;
+  const topicTitle = topic && topic.title;
+  document.getElementById('channel-detail-title').textContent = topicTitle ? `${title} › ${topicTitle}` : title;
+  document.getElementById('input-subfolder').value = sanitizeFolderName(topicTitle || title);
   updatePathPreview();
   document.getElementById('btn-start-download').disabled = true;
   document.getElementById('chk-select-all').checked = false;
@@ -227,7 +288,7 @@ async function openChannel(id, title) {
   const list = document.getElementById('videos-list');
   list.innerHTML = '<div class="loading">Cargando...</div>';
 
-  const res = await api(`/api/channels/${id}/media`);
+  const res = await api(`/api/channels/${id}/media${topic && topic.id ? `?topic=${topic.id}` : ''}`);
   if (res.error) { list.innerHTML = `<div class="empty-state">${res.error}</div>`; return; }
 
   currentMediaList = res.media.sort((a, b) => a.id - b.id);

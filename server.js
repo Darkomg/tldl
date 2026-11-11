@@ -292,8 +292,12 @@ app.get('/api/channels/:id/media', async (req, res) => {
     const isGeneralTopic = topicId === 1;
     const media = [];
     let offsetId = 0;
+    // Big groups can take minutes (and trigger flood waits); stop paging
+    // through history as soon as the browser gives up on the request.
+    let aborted = false;
+    res.on('close', () => { if (!res.writableEnded) aborted = true; });
 
-    while (true) {
+    while (!aborted) {
       const opts = { limit: 100, offsetId };
       if (topicId && !isGeneralTopic) opts.replyTo = topicId;
       const messages = await client.getMessages(entity, opts);
@@ -314,6 +318,7 @@ app.get('/api/channels/:id/media', async (req, res) => {
       offsetId = messages[messages.length - 1].id;
     }
 
+    if (aborted) return;
     res.json({ channelId: req.params.id, title: entity.title, media });
   } catch (e) {
     res.status(500).json({ error: e.message });

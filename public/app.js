@@ -38,9 +38,10 @@ function initWebSocket() {
 }
 
 // ── API helper ────────────────────────────────────────────────────────────────
-async function api(url, method = 'GET', body = null) {
+async function api(url, method = 'GET', body = null, signal = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
+  if (signal) opts.signal = signal;
   const res = await fetch(url, opts);
   return res.json();
 }
@@ -83,6 +84,7 @@ function bindEvents() {
     btn.onclick = () => {
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+      cancelMediaLoad();
       showView(btn.dataset.view);
     };
   });
@@ -90,7 +92,10 @@ function bindEvents() {
   // Channels
   document.getElementById('btn-refresh-channels').onclick = loadChannels;
   document.getElementById('input-search-channels').oninput = filterChannels;
-  document.getElementById('btn-back-channels').onclick = () => showView(currentTopic ? 'topics' : 'channels');
+  document.getElementById('btn-back-channels').onclick = () => {
+    cancelMediaLoad();
+    showView(currentTopic ? 'topics' : 'channels');
+  };
   document.getElementById('btn-back-topics').onclick = () => showView('channels');
   document.getElementById('input-search-topics').oninput = filterTopics;
 
@@ -271,6 +276,15 @@ function renderTopics(topics) {
 }
 
 // ── Channel Detail ────────────────────────────────────────────────────────────
+// Loading a big group's media can take minutes; aborting the request tells the
+// server to stop paging through Telegram history.
+let mediaLoadController = null;
+
+function cancelMediaLoad() {
+  if (mediaLoadController) mediaLoadController.abort();
+  mediaLoadController = null;
+}
+
 // `topic` is set when browsing a forum group: { id, title }, where a null id
 // means "all topics". It is null for regular channels.
 async function openChannel(id, title, topic = null) {
@@ -288,7 +302,17 @@ async function openChannel(id, title, topic = null) {
   const list = document.getElementById('videos-list');
   list.innerHTML = '<div class="loading">Cargando...</div>';
 
-  const res = await api(`/api/channels/${id}/media${topic && topic.id ? `?topic=${topic.id}` : ''}`);
+  cancelMediaLoad();
+  const controller = new AbortController();
+  mediaLoadController = controller;
+  let res;
+  try {
+    res = await api(`/api/channels/${id}/media${topic && topic.id ? `?topic=${topic.id}` : ''}`, 'GET', null, controller.signal);
+  } catch (e) {
+    if (e.name === 'AbortError') return;
+    throw e;
+  }
+  if (mediaLoadController === controller) mediaLoadController = null;
   if (res.error) { list.innerHTML = `<div class="empty-state">${res.error}</div>`; return; }
 
   currentMediaList = res.media.sort((a, b) => a.id - b.id);
